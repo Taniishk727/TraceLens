@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}
+TraceLens | Search
+{% endblock %}
+
+{% block content %}
+
+<section class="search-page">
+
+    <div class="search-container">
+
+        <h1>OSINT Investigation</h1>
+        <p>
+            Search usernames, email addresses, phone numbers, domains,
+            IP addresses, hashes, and more.
+        </p>
+
+        <form action="/search" method="POST">
+
+            <div class="search-box">
+
+                <input
+                    type="text"
+                    name="query"
+                    placeholder="Enter Username, Email, Domain, IP..."
+                    required
+                >
+
+                <button type="submit">
+                    Search
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</section>
+
+<section class="search-options">
+
+    <h2>Select Investigation Type</h2>
+
+    <div class="option-grid">
+
+        <div class="option-card">
+            <h3>Username</h3>
+            <p>Search across multiple social media platforms.</p>
+        </div>
+
+        <div class="option-card">
+            <h3>Email</h3>
+            <p>Check breaches, reputation and public records.</p>
+        </div>
+
+        <div class="option-card">
+            <h3>Phone</h3>
+            <p>Gather publicly available phone information.</p>
+        </div>
+
+        <div class="option-card">
+            <h3>Domain</h3>
+            <p>WHOIS, DNS records and subdomain discovery.</p>
+        </div>
+
+        <div class="option-card">
+            <h3>IP Address</h3>
+            <p>Geolocation, ASN and network intelligence.</p>
+        </div>
+
+        <div class="option-card">
+            <h3>Hash</h3>
+            <p>Identify common hashes and malware indicators.</p>
+        </div>
+
+    </div>
+
+</section>
+
+{% endblock %}
