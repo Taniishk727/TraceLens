@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}
+TraceLens | Invalid Target
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <!-- Header -->
+
+    <div class="text-center mb-5">
+
+        <h1 class="fw-bold text-danger">
+            Target Validation Failed
+        </h1>
+
+        <p class="text-secondary">
+            TraceLens detected the intended target type,
+            but the supplied input failed strict validation.
+        </p>
+
+    </div>
+
+
+    <!-- Validation Card -->
+
+    <div class="card dashboard-card mb-4">
+
+        <div class="card-body">
+
+            <h4 class="mb-4">
+
+                Validation Report
+
+            </h4>
+
+            <p>
+
+                <strong>Detected Target Type:</strong>
+
+                {{ validation.candidate|title }}
+
+            </p>
+
+            <p>
+
+                <strong>Reason:</strong>
+
+                {{ validation.reason }}
+
+            </p>
+
+            {% if validation.details %}
+
+            <h6 class="mt-4">
+
+                Details
+
+            </h6>
+
+            <ul>
+
+                {% for item in validation.details %}
+
+                <li>{{ item }}</li>
+
+                {% endfor %}
+
+            </ul>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- Suggestions -->
+
+    {% if validation.suggestions %}
+
+    <div class="card dashboard-card mb-4">
+
+        <div class="card-body">
+
+            <h4 class="mb-4">
+
+                Suggested Alternatives
+
+            </h4>
+
+            <p class="text-secondary">
+
+                If your input was intentional,
+                you may continue by choosing one of the following
+                investigation types.
+
+            </p>
+
+            <div class="d-flex flex-wrap gap-3">
+
+                {% for suggestion in validation.suggestions %}
+
+                <form action="/override" method="POST">
+
+                    <input
+                        type="hidden"
+                        name="target"
+                        value="{{ validation.target }}"
+                    >
+
+                    <input
+                        type="hidden"
+                        name="forced_type"
+                        value="{{ suggestion }}"
+                    >
+
+                    <button
+                        class="btn btn-outline-warning"
+                        type="submit"
+                    >
+
+                        Continue as {{ suggestion|title }}
+
+                    </button>
+
+                </form>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- Actions -->
+
+    <div class="text-center mt-5">
+
+        <a
+            href="{{ url_for('main.search') }}"
+            class="btn btn-info me-3"
+        >
+
+            Back to Search
+
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}

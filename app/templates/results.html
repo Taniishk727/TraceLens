@@ -8,7 +8,10 @@ TraceLens | Investigation Results
 
 <div class="container py-5">
 
+    <!-- ========================================= -->
     <!-- Header -->
+    <!-- ========================================= -->
+
     <div class="mb-5">
 
         <h1 class="fw-bold">
@@ -16,144 +19,50 @@ TraceLens | Investigation Results
         </h1>
 
         <p class="text-secondary">
-            Intelligence gathered for the requested target.
+            Investigation completed successfully.
         </p>
 
     </div>
 
-    <!-- Summary -->
+
+    <!-- ========================================= -->
+    <!-- Investigation Overview -->
+    <!-- ========================================= -->
 
     <div class="card dashboard-card mb-4">
 
         <div class="card-body">
 
-            <h4 class="mb-4">Investigation Summary</h4>
+            <h4 class="mb-4">
+                Investigation Overview
+            </h4>
 
             <div class="row">
 
                 <div class="col-md-6">
 
-                    <p><strong>Target:</strong> {{ data.target }}</p>
+                    <p>
+                        <strong>Target:</strong>
+                        {{ result.target }}
+                    </p>
 
-                    <p><strong>Status:</strong> {{ data.status }}</p>
-
-                    <p><strong>Target Type:</strong> {{ data.type|title }}</p>
+                    <p>
+                        <strong>Target Type:</strong>
+                        {{ result.type|title }}
+                    </p>
 
                 </div>
 
                 <div class="col-md-6">
 
-                    <p><strong>Investigation ID:</strong> TL-0001</p>
-
-                    <p><strong>Generated:</strong> Today</p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <!-- Grid -->
-
-    <div class="row g-4">
-
-        <!-- Social Media -->
-
-        <div class="col-lg-6">
-
-            <div class="card dashboard-card h-100">
-
-                <div class="card-body">
-
-                    <h5>Social Profiles</h5>
-
-                    <hr>
-
-                    <p>No social media scan performed.</p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-        <!-- Email Intelligence -->
-
-        <div class="col-lg-6">
-
-            <div class="card dashboard-card h-100">
-
-                <div class="card-body">
-
-                    <h5>Email Intelligence</h5>
-
-                    <hr>
-
-                    <p>No email investigation performed.</p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-        <!-- Domain -->
-
-        <div class="col-lg-6">
-
-            <div class="card dashboard-card h-100">
-
-                <div class="card-body">
-
-                    <h5>Domain / WHOIS</h5>
-
-                    <hr>
-
-                    <p>No domain information available.</p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-        <!-- Network -->
-
-        <div class="col-lg-6">
-
-            <div class="card dashboard-card h-100">
-
-                <div class="card-body">
-
-                    <h5>Network Intelligence</h5>
-
-                    <hr>
-
-                    <p>No IP investigation performed.</p>
-
-                </div>
-
-            </div>
-
-        </div>
-
-        <!-- Threat -->
-
-        <div class="col-lg-12">
-
-            <div class="card dashboard-card">
-
-                <div class="card-body">
-
-                    <h5>Threat Intelligence</h5>
-
-                    <hr>
+                    <p>
+                        <strong>Status:</strong>
+                        {{ result.status }}
+                    </p>
 
                     <p>
-                        Investigation engine initialized successfully.
-                        The <strong>{{ data.type }}</strong> module will be executed here.
+                        <strong>Investigation ID:</strong>
+                        TL-0001
                     </p>
 
                 </div>
@@ -164,11 +73,270 @@ TraceLens | Investigation Results
 
     </div>
 
+
+    <!-- ========================================= -->
+    <!-- Dashboard Cards -->
+    <!-- ========================================= -->
+
+    <div class="row g-4">
+
+        <!-- Summary -->
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+                        Investigation Summary
+                    </h5>
+
+                    <hr>
+
+                    <ul class="mb-0">
+
+                        <li>✓ Target validation completed.</li>
+
+                        <li>✓ Target classified successfully.</li>
+
+                        <li>✓ Investigation engine initialized.</li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- Module -->
+
+        <div class="col-lg-6">
+
+    <div class="card dashboard-card h-100">
+
+        <div class="card-body">
+
+            <h5>
+                Module Status
+            </h5>
+
+            <hr>
+
+            <p>
+                <strong>Module:</strong>
+                {{ result.data.module }}
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+
+                {% if result.data.status == "completed" %}
+                    <span class="badge bg-success">
+                        Completed
+                    </span>
+
+                {% elif result.data.status == "partial" %}
+                    <span class="badge bg-warning text-dark">
+                        Partial
+                    </span>
+
+                {% elif result.data.status == "failed" %}
+                    <span class="badge bg-danger">
+                        Failed
+                    </span>
+
+                {% else %}
+                    <span class="badge bg-secondary">
+                        {{ result.data.status|title }}
+                    </span>
+
+                {% endif %}
+
+            </p>
+
+            <p>
+
+                <strong>Summary:</strong>
+
+            </p>
+
+            <p>
+
+                {{ result.data.summary }}
+
+            </p>
+
+            <hr>
+
+            <small class="text-secondary">
+
+                Execution Time :
+                {{ result.data.metadata.execution_time }}
+
+            </small>
+
+        </div>
+
+    </div>
+
+</div>
+        <!-- Social -->
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+
+                        Social Profiles
+
+                    </h5>
+
+                    <hr>
+
+                    <p>
+
+                        Username investigation module will populate this section.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- Email -->
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+
+                        Email Intelligence
+
+                    </h5>
+
+                    <hr>
+
+                    <p>
+
+                        Email investigation module will populate this section.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- Domain -->
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+
+                        Domain Intelligence
+
+                    </h5>
+
+                    <hr>
+
+                    <p>
+
+                        Domain investigation module will populate this section.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- Network -->
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+
+                        Network Intelligence
+
+                    </h5>
+
+                    <hr>
+
+                    <p>
+
+                        IP investigation module will populate this section.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- Threat -->
+
+        <div class="col-lg-12">
+
+            <div class="card dashboard-card">
+
+                <div class="card-body">
+
+                    <h5>
+
+                        Threat Intelligence
+
+                    </h5>
+
+                    <hr>
+
+                    <p>
+
+                        Threat intelligence modules will be added in upcoming versions.
+
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ========================================= -->
     <!-- Buttons -->
+    <!-- ========================================= -->
 
     <div class="text-center mt-5">
 
-        <a href="{{ url_for('main.search') }}" class="btn btn-outline-info me-2">
+        <a href="{{ url_for('main.search') }}" class="btn btn-outline-info me-3">
 
             New Investigation
 
@@ -184,4 +352,4 @@ TraceLens | Investigation Results
 
 </div>
 
-{% endblock %}}
+{% endblock %}
