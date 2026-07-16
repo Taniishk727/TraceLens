@@ -34,8 +34,13 @@ SITES = [
     "name": "GitLab",
     "category": "Developer",
     "url": "https://gitlab.com/{}",
-    "detector": "status",
-    "expected": 200,
+
+    "detector": "api",
+
+    "api_url": "https://gitlab.com/api/v4/users?username={}",
+
+    "api_mode": "non_empty_list",
+
     "timeout": 5
 },
 

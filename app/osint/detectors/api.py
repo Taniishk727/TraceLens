@@ -41,7 +41,7 @@ from app.osint.detectors.common import (
 
 def detect(site, username, session=None):
 
-    url = site["url"].format(username)
+    url = site.get("api_url", site["url"]).format(username)
 
     timeout = site.get("timeout", DEFAULT_TIMEOUT)
 
@@ -52,7 +52,6 @@ def detect(site, username, session=None):
     timer = start_timer()
 
     try:
-
         response = request_session.get(
             url,
             headers=HEADERS,
@@ -61,20 +60,57 @@ def detect(site, username, session=None):
 
         elapsed = stop_timer(timer)
 
-        if response.status_code == expected:
+        api_mode = site.get("api_mode")
 
-            status = STATUS_FOUND
-            confidence = CONFIDENCE_HIGH
+        # --------------------------------------------------
+        # API Mode: Non-empty JSON list
+        # --------------------------------------------------
+        if api_mode == "non_empty_list":
 
-        elif response.status_code == 404:
+            try:
+                data = response.json()
+                print("STATUS:", response.status_code)
+                print("TYPE:", type(data))
+                print("DATA:", data)
 
-            status = STATUS_NOT_FOUND
-            confidence = CONFIDENCE_HIGH
+                if response.status_code != 200:
+                    status = STATUS_UNKNOWN
+                    confidence = CONFIDENCE_LOW
 
+                elif isinstance(data, list):
+
+                    if len(data) > 0:
+                        status = STATUS_FOUND
+                        confidence = CONFIDENCE_HIGH
+                    else:
+                        status = STATUS_NOT_FOUND
+                        confidence = CONFIDENCE_HIGH
+                    print("STATUS SELECTED:", status)
+
+                else:
+                    status = STATUS_UNKNOWN
+                    confidence = CONFIDENCE_LOW
+
+            except ValueError:
+                status = STATUS_UNKNOWN
+                confidence = CONFIDENCE_LOW
+
+        # --------------------------------------------------
+        # Default API Mode (Status Code)
+        # --------------------------------------------------
         else:
 
-            status = STATUS_UNKNOWN
-            confidence = CONFIDENCE_LOW
+            if response.status_code == expected:
+                status = STATUS_FOUND
+                confidence = CONFIDENCE_HIGH
+
+            elif response.status_code == 404:
+                status = STATUS_NOT_FOUND
+                confidence = CONFIDENCE_HIGH
+
+            else:
+                status = STATUS_UNKNOWN
+                confidence = CONFIDENCE_LOW
 
         return build_result(
             site=site,
@@ -88,7 +124,6 @@ def detect(site, username, session=None):
                 "content_type": response.headers.get("Content-Type")
             }
         )
-
     except requests.Timeout:
 
         elapsed = stop_timer(timer)
