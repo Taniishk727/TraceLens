@@ -70,6 +70,7 @@ def detect(site, username, session=None):
     """
 
     url = site["url"].format(username)
+    
 
     timeout = site.get(
         "timeout",
@@ -98,6 +99,14 @@ def detect(site, username, session=None):
             allow_redirects=True
 
         )
+        print("=" * 50)
+        print("URL Requested :", url)
+        print("Final URL     :", response.url)
+        print("Status Code   :", response.status_code)
+        print("Headers       :", response.headers)
+        print("Body Preview  :")
+        print(response.text[:500])
+        print("=" * 50)
 
         elapsed = stop_timer(timer)
 

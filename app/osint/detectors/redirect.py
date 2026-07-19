@@ -64,6 +64,40 @@ def detect(site, username, session=None):
 
         final_url = response.url.lower()
 
+        # --------------------------------------------------
+# HTTP Status takes precedence
+# --------------------------------------------------
+
+        if response.status_code in site.get("not_found_status", [404, 410]):
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_NOT_FOUND,
+                status_code=response.status_code,
+                confidence=CONFIDENCE_HIGH,
+                response_time=elapsed,
+                detector=DISPLAY_REDIRECT,
+                extra={
+                    "final_url": response.url
+                }
+            )
+
+        # Login wall / bot protection
+        if response.status_code in site.get("unknown_status", [401, 403, 429, 999]):
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_UNKNOWN,
+                status_code=response.status_code,
+                confidence=CONFIDENCE_LOW,
+                response_time=elapsed,
+                detector=DISPLAY_REDIRECT,
+                error="Authentication or bot protection",
+                extra={
+                    "final_url": response.url
+                }
+            )
+
         for marker in redirect_markers:
 
             if marker.lower() in final_url:
