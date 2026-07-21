@@ -26,6 +26,7 @@ SITES = [
     "category": "Developer",
     "url": "https://github.com/{}",
     "detector": "status",
+    "transport": "requests",
     "expected": 200,
     "timeout": 5
 },
@@ -34,13 +35,10 @@ SITES = [
     "name": "GitLab",
     "category": "Developer",
     "url": "https://gitlab.com/{}",
-
     "detector": "api",
-
     "api_url": "https://gitlab.com/api/v4/users?username={}",
-
     "api_mode": "non_empty_list",
-
+    "transport": "requests",
     "timeout": 5
 },
 
@@ -50,6 +48,7 @@ SITES = [
     "category": "Developer",
     "detector": "api",
     "api_url": "https://api.bitbucket.org/2.0/workspaces/{}",
+    "transport": "requests",
     "timeout": 5
 },
 
@@ -58,6 +57,7 @@ SITES = [
     "category": "Developer",
     "url": "https://sourceforge.net/u/{}/profile/",
     "detector": "status",
+    "transport": "requests",
     "expected": 200,
     "timeout": 5
 },
@@ -66,6 +66,7 @@ SITES = [
     "name": "Launchpad",
     "category": "Developer",
     "url": "https://launchpad.net/~{}",
+    "transport": "requests",
     "detector": "status",
     "expected": 200,
     "timeout": 5
@@ -76,6 +77,7 @@ SITES = [
     "name": "CodePen",
     "category": "Developer",
     "url": "https://codepen.io/{}",
+    "transport": "browser",
     "detector": "status",
     "expected": 200,
     "timeout": 5
@@ -88,6 +90,7 @@ SITES = [
     "category": "Developer",
     "url": "https://replit.com/@{}",
     "detector": "html",
+    "transport": "requests",
     "found": [],
     "not_found": [],
     "timeout": 5
@@ -99,6 +102,7 @@ SITES = [
     "category": "Developer",
     "url": "https://hashnode.com/@{}",
     "detector": "html",
+    "transport": "requests",
     "found": [],
     "not_found": [],
     "timeout": 5
@@ -111,6 +115,7 @@ SITES = [
     "url": "https://hub.docker.com/u/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5,
     "found": [],
 "not_found": []
@@ -121,6 +126,7 @@ SITES = [
     "category": "Developer",
     "url": "https://huggingface.co/{}",
     "detector": "status",
+    "transport": "requests",
     "expected": 200,
     "timeout": 5,
     "found": [],
@@ -135,6 +141,7 @@ SITES = [
     "url": "https://www.kaggle.com/{}",
     "detector": "html",
     "found": [],
+    "transport": "requests",
     "not_found": [],
     "timeout": 5,
     "found": [],
@@ -146,6 +153,7 @@ SITES = [
     "category": "Developer",
     "url": "https://www.npmjs.com/~{}",
     "detector": "status",
+    "transport": "browser",
     "expected": 200,
     "timeout": 5,
     "found": [],
@@ -162,6 +170,7 @@ SITES = [
     "category": "Social",
     "url": "https://www.reddit.com/user/{}",
     "detector": "html",
+    "transport": "requests",
     "found": [
         "karma"
     ],
@@ -177,6 +186,7 @@ SITES = [
     "category": "Social",
     "url": "https://www.instagram.com/{}/",
     "detector": "html",
+    "transport": "requests",
     "found": [
         "followers",
         "following"
@@ -191,6 +201,7 @@ SITES = [
     "name": "X",
     "category": "Social",
     "url": "https://x.com/{}",
+    "transport": "requests",
 
     "detector": "redirect",
 
@@ -218,6 +229,7 @@ SITES = [
     "category": "Social",
     "url": "https://www.threads.net/@{}",
     "detector": "html",
+    "transport": "requests",
     "found": [
         "threads"
     ],
@@ -236,6 +248,7 @@ SITES = [
     "category": "Social",
     "url": "https://www.facebook.com/{}",
     "detector": "html",
+    "transport": "requests",
 
     "found": [
        "follewers"
@@ -260,6 +273,7 @@ SITES = [
     "url": "https://www.linkedin.com/in/{}",
 
     "detector": "redirect",
+    "transport": "requests",
 
     # LinkedIn blocks bots with 999
     "unknown_status": [
@@ -285,6 +299,7 @@ SITES = [
     "category": "Social",
     "url": "https://www.pinterest.com/{}/",
     "detector": "html",
+    "transport": "requests",
     "found": [
         "followers"
     ],
@@ -304,6 +319,7 @@ SITES = [
     "category": "Social",
     "url": "https://{}.tumblr.com",
     "detector": "html",
+    "transport": "requests",
     "found": [
         "archive"
     ],
@@ -318,6 +334,7 @@ SITES = [
     "category": "Social",
     "url": "https://www.snapchat.com/add/{}",
     "detector": "status",
+    "transport": "requests",
     "expected": 200,
     "timeout": 5
 },
@@ -333,6 +350,7 @@ SITES = [
         "url": "https://dev.to/{}",
         "detector": "status",
         "expected": 200,
+        "transport": "requests",
         "timeout": 5
     },
 
@@ -345,6 +363,7 @@ SITES = [
         "category": "Security",
         "url": "https://hackerone.com/{}",
         "detector": "status",
+        "transport": "requests",
         "expected": 200,
         "timeout": 5
     },
@@ -355,6 +374,7 @@ SITES = [
         "url": "https://bugcrowd.com/{}",
         "detector": "status",
         "expected": 200,
+        "transport": "requests",
         "timeout": 5
     },
 
@@ -367,6 +387,7 @@ SITES = [
         "url": "https://tryhackme.com/p/{}",
         "detector": "status",
         "expected": 200,
+        "transport": "requests",
         "timeout": 5
     },
 
@@ -379,6 +400,7 @@ SITES = [
         "category": "Security",
         "url": "https://app.hackthebox.com/users/{}",
         "detector": "status",
+        "transport": "requests",
         "expected": 200,
         "timeout": 5
     },
@@ -396,6 +418,7 @@ SITES = [
     "category": "Competitive Programming",
     "url": "https://leetcode.com/u/{}/",
     "detector": "status",
+    "transport": "requests",
     "expected": 200,
     "timeout": 5
 },
@@ -410,6 +433,7 @@ SITES = [
     "category": "Coding",
     "url": "https://www.hackerrank.com/profile/{}",
     "detector": "html",
+    "transport": "requests",
     "found": ["Education","Certifications","Badges"],
     "not_found": [
         "We could not find the page you were looking for"
@@ -422,6 +446,7 @@ SITES = [
     "category": "Competitive Programming",
     "url": "https://www.codechef.com/users/{}",
     "detector": "html",
+    "transport": "requests",
     "found": ["Username:","Country:","Organisation:"],
     "not_found": [" The username specified does not exist in our database."],
     "timeout": 5
@@ -432,6 +457,7 @@ SITES = [
     "category": "Competitive Programming",
     "url": "https://codeforces.com/profile/{}",
     "detector": "html",
+    "transport": "requests",
     "found": ["Contest rating","contribution","problems"],
     "not_found": ["Unofficial participants","Official participants"],
     "timeout": 5
@@ -441,6 +467,7 @@ SITES = [
     "category": "Competitive Programming",
     "url": "https://atcoder.jp/users/{}",
     "detector": "status",
+    "transport": "requests",
     "expected": 200,
     "timeout": 5
 },
@@ -457,6 +484,7 @@ SITES = [
     "detector": "html",
     "found": [],
     "not_found": [],
+    "transport": "requests",
     "timeout": 5
 },
 
@@ -474,6 +502,7 @@ SITES = [
     "url": "https://www.canva.com/p/{}",
     "detector": "html",
     "timeout": 5,
+    "transport": "requests",
     "found": [],
 "not_found": [],
 },
@@ -485,6 +514,7 @@ SITES = [
     "detector": "html",
     "timeout": 5,
     "found": [],
+    "transport": "requests",
 "not_found": []
 },
 
@@ -494,6 +524,7 @@ SITES = [
     "url": "https://www.producthunt.com/@{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5
 },
 
@@ -503,6 +534,7 @@ SITES = [
     "url": "https://about.me/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5,
     "found": [],
 "not_found": []
@@ -515,6 +547,7 @@ SITES = [
     "detector": "status",
     "expected": 200,
     "timeout": 5,
+    "transport": "requests",
     "found": [],
 "not_found": []
 },
@@ -525,6 +558,7 @@ SITES = [
     "url": "https://{}.carrd.co",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5
 },
 
@@ -534,6 +568,7 @@ SITES = [
     "url": "https://buymeacoffee.com/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5,
     "found": [],
 "not_found": []
@@ -548,6 +583,7 @@ SITES = [
     "detector": "status",
     "expected": 200,
     "timeout": 5,
+    "transport": "requests",
     "found": [],
 "not_found": []
 },
@@ -567,6 +603,7 @@ SITES = [
     "detector": "html",
     "timeout": 5,
     "found": [],
+    "transport": "requests",
 "not_found": []
 },
 
@@ -579,6 +616,7 @@ SITES = [
     "detector": "status",
     "expected": 200,
     "timeout": 5,
+    "transport": "requests",
     "found": [],
 "not_found": []
 },
@@ -589,6 +627,7 @@ SITES = [
     "url": "https://lichess.org/@/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5,
     "found": [],
 "not_found": []
@@ -606,15 +645,23 @@ SITES = [
     "url": "https://rubygems.org/profiles/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5
 },
 
+# TODO: Crates.io investigation (Phase 2)
+# Browser successfully loads valid user profiles, but HTTP requests from
+# TraceLens receive a genuine 404 with an empty response body.
+# URL pattern appears correct.
+# Investigate request headers, User-Agent, Accept headers, and possible
+# anti-bot/client detection. Do not change the detector until resolved.
 {
     "name": "Crates.io",
     "category": "Open Source",
     "url": "https://crates.io/users/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5
 },
 
@@ -624,17 +671,23 @@ SITES = [
     "url": "https://packagist.org/users/{}",
     "detector": "status",
     "expected": 200,
+    "transport": "requests",
     "timeout": 5
 },
 
 
-
+# TODO: ResearchGate is protected by Cloudflare.
+# Automated HTTP requests trigger a security check instead of the profile page.
+# Requires browser automation (Playwright/Selenium) or an alternative API.
+# Revisit in Phase 2.   
 {
     "name": "ResearchGate",
     "category": "Research",
     "url": "https://www.researchgate.net/profile/{}",
     "detector": "html",
+    "transport": "browser",
     "timeout": 5,
+    "transport": "requests",
     "found": [],
 "not_found": []
 }

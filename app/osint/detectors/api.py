@@ -9,26 +9,19 @@ Used For
 --------
 - GitHub API
 - Mastodon
-- Future GraphQL services
-- REST-based platforms
+- GraphQL services
+- REST APIs
 
-Author:
-TraceLens
+Networking is handled by the selected Transport.
 """
 
-import requests
-
 from app.osint.detectors.constants import (
-    HEADERS,
-    DEFAULT_TIMEOUT,
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_UNKNOWN,
-    STATUS_TIMEOUT,
     DISPLAY_API,
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
-    CONFIDENCE_NONE,
 )
 
 from app.osint.detectors.common import (
@@ -39,119 +32,88 @@ from app.osint.detectors.common import (
 )
 
 
-def detect(site, username, session=None):
+def detect(site, username, transport):
 
     url = site.get("api_url", site["url"]).format(username)
 
-    timeout = site.get("timeout", DEFAULT_TIMEOUT)
-
     expected = site.get("expected", 200)
-
-    request_session = session or requests.Session()
 
     timer = start_timer()
 
-    try:
-        response = request_session.get(
-            url,
-            headers=HEADERS,
-            timeout=timeout
-        )
+    response = transport.fetch(url)
 
-        elapsed = stop_timer(timer)
+    elapsed = stop_timer(timer)
 
-        api_mode = site.get("api_mode")
-
-        # --------------------------------------------------
-        # API Mode: Non-empty JSON list
-        # --------------------------------------------------
-        if api_mode == "non_empty_list":
-
-            try:
-                data = response.json()
-                print("STATUS:", response.status_code)
-                print("TYPE:", type(data))
-                print("DATA:", data)
-
-                if response.status_code != 200:
-                    status = STATUS_UNKNOWN
-                    confidence = CONFIDENCE_LOW
-
-                elif isinstance(data, list):
-
-                    if len(data) > 0:
-                        status = STATUS_FOUND
-                        confidence = CONFIDENCE_HIGH
-                    else:
-                        status = STATUS_NOT_FOUND
-                        confidence = CONFIDENCE_HIGH
-                    print("STATUS SELECTED:", status)
-
-                else:
-                    status = STATUS_UNKNOWN
-                    confidence = CONFIDENCE_LOW
-
-            except ValueError:
-                status = STATUS_UNKNOWN
-                confidence = CONFIDENCE_LOW
-
-        # --------------------------------------------------
-        # Default API Mode (Status Code)
-        # --------------------------------------------------
-        else:
-
-            if response.status_code == expected:
-                status = STATUS_FOUND
-                confidence = CONFIDENCE_HIGH
-
-            elif response.status_code == 404:
-                status = STATUS_NOT_FOUND
-                confidence = CONFIDENCE_HIGH
-
-            else:
-                status = STATUS_UNKNOWN
-                confidence = CONFIDENCE_LOW
-
-        return build_result(
-            site=site,
-            url=url,
-            status=status,
-            status_code=response.status_code,
-            confidence=confidence,
-            response_time=elapsed,
-            detector=DISPLAY_API,
-            extra={
-                "content_type": response.headers.get("Content-Type")
-            }
-        )
-    except requests.Timeout:
-
-        elapsed = stop_timer(timer)
-
-        return build_result(
-            site=site,
-            url=url,
-            status=STATUS_TIMEOUT,
-            status_code=None,
-            confidence=CONFIDENCE_NONE,
-            response_time=elapsed,
-            detector=DISPLAY_API,
-            error="Request Timed Out"
-        )
-
-    except requests.RequestException as exc:
-
-        elapsed = stop_timer(timer)
-
+    if not response["success"]:
         return build_error(
             site=site,
             url=url,
             response_time=elapsed,
             detector=DISPLAY_API,
-            error=exc
+            error=response.get("error", "Unknown transport error"),
         )
 
-    finally:
+    status_code = response["status"]
 
-        if session is None:
-            request_session.close()
+    api_mode = site.get("api_mode")
+
+    # --------------------------------------------------
+    # API Mode: Non-empty JSON list
+    # --------------------------------------------------
+
+    if api_mode == "non_empty_list":
+
+        data = response.get("json")
+
+        if status_code != 200:
+
+            status = STATUS_UNKNOWN
+            confidence = CONFIDENCE_LOW
+
+        elif isinstance(data, list):
+
+            if len(data) > 0:
+                status = STATUS_FOUND
+                confidence = CONFIDENCE_HIGH
+            else:
+                status = STATUS_NOT_FOUND
+                confidence = CONFIDENCE_HIGH
+
+        else:
+
+            status = STATUS_UNKNOWN
+            confidence = CONFIDENCE_LOW
+
+    # --------------------------------------------------
+    # Default API Mode
+    # --------------------------------------------------
+
+    else:
+
+        if status_code == expected:
+
+            status = STATUS_FOUND
+            confidence = CONFIDENCE_HIGH
+
+        elif status_code == 404:
+
+            status = STATUS_NOT_FOUND
+            confidence = CONFIDENCE_HIGH
+
+        else:
+
+            status = STATUS_UNKNOWN
+            confidence = CONFIDENCE_LOW
+
+    return build_result(
+        site=site,
+        url=url,
+        status=status,
+        status_code=status_code,
+        confidence=confidence,
+        response_time=elapsed,
+        detector=DISPLAY_API,
+        extra={
+            "content_type": response["headers"].get("Content-Type")
+        }
+    )

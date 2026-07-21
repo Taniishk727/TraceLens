@@ -13,7 +13,8 @@ Responsibilities
 4. Return a standardized response
 
 """
-
+# from transport.requests_transport import RequestsTransport
+# from transport.browser_transport import BrowserTransport
 from app.osint.detector import detect_target
 from app.osint.modules import (
     username,
@@ -23,6 +24,8 @@ from app.osint.modules import (
     phone,
     hash
 )
+# REQUESTS_TRANSPORT = RequestsTransport()
+# BROWSER_TRANSPORT = BrowserTransport()
 MODULE_REGISTRY = {
 
     "username": username.investigate,

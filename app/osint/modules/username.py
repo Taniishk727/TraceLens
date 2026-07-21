@@ -5,13 +5,16 @@ Dispatcher-based architecture.
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
-import requests
+from app.osint.transport.requests_transport import RequestsTransport
+from app.osint.transport.browser_transport import BrowserTransport
 
 from app.osint.data.username_sites import SITES
 from app.osint.detectors.registry import get_detector
 
 
 MAX_WORKERS = min(16, len(SITES))
+REQUESTS_TRANSPORT = RequestsTransport()
+BROWSER_TRANSPORT = BrowserTransport()
 
 
 STATUS_PRIORITY = {
@@ -23,7 +26,7 @@ STATUS_PRIORITY = {
 }
 
 
-def run_detector(session, site, username):
+def run_detector(site, username):
     detector_name = site.get("detector")
 
     detector = get_detector(detector_name)
@@ -41,27 +44,46 @@ def run_detector(session, site, username):
             "error": f"Detector '{detector_name}' is not registered."
         }
 
-    return detector(site=site, username=username, session=session)
+    transport_name = site.get("transport", "requests")
 
+    transport = (
+        BROWSER_TRANSPORT
+        if transport_name == "browser"
+        else REQUESTS_TRANSPORT
+    )
+
+    return detector(
+        site=site,
+        username=username,
+        transport=transport,
+    )
 
 def investigate(username):
     start = time.perf_counter()
 
     profiles = []
 
-    session = requests.Session()
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 
-    try:
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = [
-                executor.submit(run_detector, session, site, username)
-                for site in SITES
-            ]
+        futures = []
 
-            for future in as_completed(futures):
-                profiles.append(future.result())
-    finally:
-        session.close()
+        # Run requests-based sites concurrently
+        for site in SITES:
+            if site.get("transport", "requests") == "requests":
+                futures.append(
+                    executor.submit(run_detector, site, username)
+                )
+
+        # Collect concurrent results
+        for future in as_completed(futures):
+            profiles.append(future.result())
+
+    # Run browser sites sequentially (Playwright is not thread-safe)
+    for site in SITES:
+        if site.get("transport") == "browser":
+            profiles.append(
+                run_detector(site, username)
+            )
 
     profiles.sort(
         key=lambda p: (
