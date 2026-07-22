@@ -71,8 +71,7 @@ SITES = [
     "expected": 200,
     "timeout": 5
 },
-# TODO: CodePen blocks automated requests (HTTP 403).
-# Revisit later with browser headers, cookies, or an alternative API.
+
 {
     "name": "CodePen",
     "category": "Developer",
@@ -83,26 +82,49 @@ SITES = [
     "timeout": 5
 },
 
-# TODO: Replit profile pages require authentication.
-# Investigate public API or GraphQL endpoint.
+# TODO (Phase 3):
+# Replit currently redirects anonymous users to a login page.
+# Both valid and invalid usernames return HTTP 200 with authentication required,
+# making HTML/status detection impossible.
+#
+# Investigate:
+# 1. Undocumented GraphQL or REST endpoint used by the frontend.
+# 2. Whether Playwright with an authenticated session can access public profiles.
+# 3. Whether a stable anonymous endpoint exists for username validation.
+#
+# Current status:
+# - Anonymous requests => Login page (HTTP 200)
+# - Detector result => Unknown
 {
     "name": "Replit",
     "category": "Developer",
     "url": "https://replit.com/@{}",
     "detector": "html",
-    "transport": "requests",
+    "transport": "browser",
     "found": [],
     "not_found": [],
     "timeout": 5
 },
-# TODO: Migrate Hashnode to GraphQL API.
-# Profile pages return HTTP 200 for both existing and non-existing users.
+# TODO (Phase 3):
+# Hashnode currently serves a login/client-rendered page for anonymous requests.
+# Both valid and invalid usernames return HTTP 200, preventing reliable
+# username detection using status or HTML markers.
+#
+# Investigate:
+# 1. Undocumented GraphQL endpoint used by Hashnode.
+# 2. Public API for fetching user profiles.
+# 3. Whether Playwright with an authenticated session can distinguish
+#    valid and invalid usernames.
+#
+# Current status:
+# - Anonymous requests => Login/client-rendered page (HTTP 200)
+# - Detector result => Unknown
 {
     "name": "Hashnode",
     "category": "Developer",
     "url": "https://hashnode.com/@{}",
     "detector": "html",
-    "transport": "requests",
+    "transport": "browser",
     "found": [],
     "not_found": [],
     "timeout": 5
@@ -133,19 +155,14 @@ SITES = [
 "not_found": []
 },
 
-# TODO: Migrate Kaggle to API detector.
-# Profile pages return HTTP 200 for both existing and non-existing users.
 {
     "name": "Kaggle",
     "category": "Developer",
     "url": "https://www.kaggle.com/{}",
-    "detector": "html",
-    "found": [],
+    "detector": "status",
+    "expected": 200,
     "transport": "requests",
-    "not_found": [],
-    "timeout": 5,
-    "found": [],
-"not_found": []
+    "timeout": 5
 },
 
 {
@@ -163,8 +180,19 @@ SITES = [
 # Social Media
 # ======================================================
 
-# TODO: Migrate Reddit from HTML to JSON API.
-# HTML layout has changed; current markers are obsolete.
+# TODO (Phase 3):
+# Reddit anonymous profile pages are not reliably detectable.
+#
+# Current behavior:
+# - Valid username   -> 200 OK -> Profile visible in browser -> HTML has no stable markers.
+# - Invalid username -> 200 OK -> Brief "Nobody goes by that name" UI -> Login prompt.
+#
+# page.content() does not contain reliable found/not_found markers for either case.
+#
+# Future investigation:
+# 1. Reverse engineer Reddit's internal GraphQL/JSON endpoints.
+# 2. Investigate authenticated browser sessions.
+# 3. Inspect network/XHR requests instead of rendered HTML.
 {
     "name": "Reddit",
     "category": "Social",
@@ -172,7 +200,7 @@ SITES = [
     "detector": "html",
     "transport": "requests",
     "found": [
-        "karma"
+        "karma","Contributions","Moderator of these communities","members"
     ],
     "not_found": [
         "sorry, nobody on reddit goes by that name"

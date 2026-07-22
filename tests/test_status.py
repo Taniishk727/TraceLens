@@ -14,8 +14,6 @@ TraceLens
 
 from unittest.mock import Mock
 
-import requests
-
 from app.osint.detectors.status import detect
 
 from app.osint.detectors.constants import (
@@ -36,17 +34,11 @@ from app.osint.detectors.constants import (
 # ==========================================================
 
 SITE = {
-
     "name": "GitHub",
-
     "category": "Developer",
-
     "url": "https://github.com/{}",
-
     "expected": 200,
-
     "timeout": 5
-
 }
 
 
@@ -55,27 +47,21 @@ SITE = {
 # ==========================================================
 
 def test_found():
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": True,
+        "status": 200,
+        "final_url": "https://github.com/torvalds",
+        "error": None
+    }
 
-    session = Mock()
-
-    response = Mock()
-
-    response.status_code = 200
-
-    session.get.return_value = response
-
-    result = detect(SITE, "torvalds", session)
+    result = detect(SITE, "torvalds", transport)
 
     assert result["status"] == STATUS_FOUND
-
     assert result["status_code"] == 200
-
     assert result["confidence"] == CONFIDENCE_HIGH
-
     assert result["detector"] == DISPLAY_STATUS
-
     assert result["site"] == "GitHub"
-
     assert result["url"] == "https://github.com/torvalds"
 
 
@@ -84,21 +70,18 @@ def test_found():
 # ==========================================================
 
 def test_not_found():
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": True,
+        "status": 404,
+        "final_url": "https://github.com/this_user_does_not_exist",
+        "error": None
+    }
 
-    session = Mock()
-
-    response = Mock()
-
-    response.status_code = 404
-
-    session.get.return_value = response
-
-    result = detect(SITE, "this_user_does_not_exist", session)
+    result = detect(SITE, "this_user_does_not_exist", transport)
 
     assert result["status"] == STATUS_NOT_FOUND
-
     assert result["status_code"] == 404
-
     assert result["confidence"] == CONFIDENCE_HIGH
 
 
@@ -107,21 +90,18 @@ def test_not_found():
 # ==========================================================
 
 def test_unknown_status():
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": True,
+        "status": 500,
+        "final_url": "https://github.com/torvalds",
+        "error": None
+    }
 
-    session = Mock()
-
-    response = Mock()
-
-    response.status_code = 500
-
-    session.get.return_value = response
-
-    result = detect(SITE, "torvalds", session)
+    result = detect(SITE, "torvalds", transport)
 
     assert result["status"] == STATUS_UNKNOWN
-
     assert result["status_code"] == 500
-
     assert result["confidence"] == CONFIDENCE_LOW
 
 
@@ -130,17 +110,17 @@ def test_unknown_status():
 # ==========================================================
 
 def test_timeout():
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": False,
+        "status": None,
+        "error": "Timeout",
+    }
 
-    session = Mock()
+    result = detect(SITE, "torvalds", transport)
 
-    session.get.side_effect = requests.Timeout()
-
-    result = detect(SITE, "torvalds", session)
-
-    assert result["status"] == STATUS_TIMEOUT
-
+    assert result["status"] == STATUS_ERROR
     assert result["confidence"] == CONFIDENCE_NONE
-
     assert result["status_code"] is None
 
 
@@ -149,19 +129,18 @@ def test_timeout():
 # ==========================================================
 
 def test_request_exception():
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": False,
+        "status": None,
+        "error": "Network Error",
+    }
 
-    session = Mock()
-
-    session.get.side_effect = requests.ConnectionError("Network Error")
-
-    result = detect(SITE, "torvalds", session)
+    result = detect(SITE, "torvalds", transport)
 
     assert result["status"] == STATUS_ERROR
-
     assert result["confidence"] == CONFIDENCE_NONE
-
     assert result["status_code"] is None
-
     assert "Network Error" in result["error"]
 
 
@@ -170,18 +149,16 @@ def test_request_exception():
 # ==========================================================
 
 def test_url_formatting():
-
-    session = Mock()
-
-    response = Mock()
-
-    response.status_code = 200
-
-    session.get.return_value = response
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": True,
+        "status": 200,
+        "final_url": "https://github.com/john_doe",
+        "error": None
+    }
 
     username = "john_doe"
-
-    result = detect(SITE, username, session)
+    result = detect(SITE, username, transport)
 
     assert result["url"] == f"https://github.com/{username}"
 
@@ -191,17 +168,15 @@ def test_url_formatting():
 # ==========================================================
 
 def test_response_time_exists():
+    transport = Mock()
+    transport.fetch.return_value = {
+        "success": True,
+        "status": 200,
+        "final_url": "https://github.com/torvalds",
+        "error": None
+    }
 
-    session = Mock()
-
-    response = Mock()
-
-    response.status_code = 200
-
-    session.get.return_value = response
-
-    result = detect(SITE, "torvalds", session)
+    result = detect(SITE, "torvalds", transport)
 
     assert isinstance(result["response_time"], float)
-
     assert result["response_time"] >= 0
