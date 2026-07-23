@@ -60,14 +60,14 @@ class RequestsTransport:
             }
 
         except requests.RequestException as e:
-            try:
-                json_data = response.json()
-            except ValueError:
-                json_data = None
-            
             return {
                 "success": False,
                 "error": str(e),
+                "status": None,
+                "final_url": url,
+                "headers": {},
+                "html": "",
+                "length": 0,
                 "elapsed": round(time.time() - start, 2),
-                "json": json_data
+                "json": None
             }

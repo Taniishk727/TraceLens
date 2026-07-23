@@ -424,3 +424,65 @@ footer{
     color:#d0d0d0;
 
 }
+
+/* ===========================
+   NETWORK LOADER OVERLAY
+   =========================== */
+
+/* Thin scrollbar for the platform list inside the panel */
+#tl-plat-list::-webkit-scrollbar{
+    width:4px;
+}
+#tl-plat-list::-webkit-scrollbar-track{
+    background:transparent;
+}
+#tl-plat-list::-webkit-scrollbar-thumb{
+    background:rgba(0,212,255,.2);
+    border-radius:4px;
+}
+
+/* Spinner & SVG Icon Container for Network Loader */
+@keyframes tlSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.tl-spin {
+    animation: tlSpin 0.85s linear infinite;
+    transform-origin: center;
+}
+
+.tl-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+/* Responsive: hide panel on very small screens */
+@media(max-width:600px){
+    #tl-overlay > div:last-child{
+        display:none;
+    }
+}
+
+/* ===========================
+   RESULTS PAGE FADE-IN
+   =========================== */
+
+@keyframes tlResultsFadeIn{
+    from{
+        opacity:0;
+        transform:translateY(14px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+.tl-results-entry{
+    animation:tlResultsFadeIn .65s cubic-bezier(.22,1,.36,1) both;
+}

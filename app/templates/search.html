@@ -25,10 +25,11 @@ TraceLens | Search
                     name="query"
                     placeholder="Enter Username, Email, Domain, IP..."
                     required
+                    autocomplete="off"
                 >
 
-                <button type="submit">
-                    Search
+                <button type="submit" id="tl-search-btn">
+                    <span id="tl-btn-text">Search</span>
                 </button>
 
             </div>
@@ -78,5 +79,13 @@ TraceLens | Search
     </div>
 
 </section>
+
+{# ── Inject platform list for the animation engine ── #}
+<script>
+window.TL_PLATFORMS = {{ platforms | tojson }};
+</script>
+
+{# ── Animation engine (must come after TL_PLATFORMS) ── #}
+<script src="{{ url_for('static', filename='js/network-loader.js') }}"></script>
 
 {% endblock %}

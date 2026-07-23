@@ -83,6 +83,6 @@ def create_app():
 
     print("=" * 60)
 
-    print("✓ TraceLens initialized successfully.\n")
+    print("[OK] TraceLens initialized successfully.\n")
 
     return app
