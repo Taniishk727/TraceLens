@@ -1,12 +1,17 @@
 """
 ============================================================
-TraceLens HTML Detector (v3)
+TraceLens HTML Detector (v4)
 ============================================================
 
 Determines profile existence using HTML content.
 
-Networking is handled by the selected Transport.
-This detector only analyzes the returned HTML.
+Detection order
+
+    1. HTTP Status
+    2. Not-found markers
+    3. Found markers
+    4. Login wall
+    5. Unknown
 """
 
 from bs4 import BeautifulSoup
@@ -30,15 +35,6 @@ from app.osint.detectors.common import (
 
 
 def detect(site, username, transport):
-    """
-    Detection order
-
-        1. HTTP Status
-        2. Not-found markers
-        3. Login wall
-        4. Found markers
-        5. Unknown
-    """
 
     url = site["url"].format(username)
 
@@ -58,7 +54,6 @@ def detect(site, username, transport):
         )
 
     status_code = response["status"]
-
     html = response["html"]
 
     soup = BeautifulSoup(html, "html.parser")
@@ -136,24 +131,7 @@ def detect(site, username, transport):
             )
 
     # ----------------------------------------------------
-    # Login wall
-    # ----------------------------------------------------
-
-    if any(marker in searchable_text for marker in login_markers):
-
-        return build_result(
-            site=site,
-            url=url,
-            status=STATUS_UNKNOWN,
-            status_code=status_code,
-            confidence=CONFIDENCE_UNKNOWN,
-            response_time=elapsed,
-            detector=DISPLAY_HTML,
-            error="Authentication/Login required",
-        )
-
-    # ----------------------------------------------------
-    # Found markers
+    # Found markers (Moved BEFORE login detection)
     # ----------------------------------------------------
 
     matches = 0
@@ -179,6 +157,23 @@ def detect(site, username, transport):
             confidence=confidence,
             response_time=elapsed,
             detector=DISPLAY_HTML,
+        )
+
+    # ----------------------------------------------------
+    # Login wall
+    # ----------------------------------------------------
+
+    if login_markers and any(marker in searchable_text for marker in login_markers):
+
+        return build_result(
+            site=site,
+            url=url,
+            status=STATUS_UNKNOWN,
+            status_code=status_code,
+            confidence=CONFIDENCE_UNKNOWN,
+            response_time=elapsed,
+            detector=DISPLAY_HTML,
+            error="Authentication/Login required",
         )
 
     # ----------------------------------------------------

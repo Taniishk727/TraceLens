@@ -211,18 +211,20 @@ SITES = [
 # Needs API / HTML Update
 {
     "name": "Instagram",
-    "category": "Social",
+    "category": "Social Media",
     "url": "https://www.instagram.com/{}/",
+    "transport": "browser",
     "detector": "html",
-    "transport": "requests",
-    "found": [
-        "followers",
-        "following"
-    ],
-    "not_found": [
-        "sorry, this page isn't available"
-    ],
-    "timeout": 5
+   "found": [
+    'property="og:description"',
+    'property="og:title"',
+    'property="og:image"',
+],
+
+"not_found": [
+    "Profile isn't available"
+],
+    "timeout": 15
 },
 
 {

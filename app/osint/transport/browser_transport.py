@@ -120,10 +120,10 @@ class BrowserTransport:
 
         try:
             response = page.goto(
-                url,
-                wait_until="domcontentloaded",
-                timeout=self.timeout,
-            )
+            url,
+            wait_until="networkidle",
+            timeout=self.timeout,
+        )
 
             try:
                 page.wait_for_load_state("networkidle", timeout=5000)
@@ -131,6 +131,31 @@ class BrowserTransport:
                 pass
 
             page.wait_for_timeout(self.wait_time)
+            # -------------------------------------------------
+            # Instagram login popup dismissal
+            # -------------------------------------------------
+
+            if "instagram.com" in page.url.lower():
+
+                selectors = [
+                    "button[aria-label='Close']",
+                    "svg[aria-label='Close']",
+                    "div[role='dialog'] button",
+                    "button:has-text('Not Now')",
+                    "button:has-text('Close')",
+                ]
+
+                # Wait until the profile metadata appears
+            try:
+                page.wait_for_function(
+                    """
+                    () => document.documentElement.innerHTML.includes('property="og:description"')
+                    """,
+                    timeout=8000
+                )
+            except Exception:
+                pass
+
             html = page.content()
 
             return {
