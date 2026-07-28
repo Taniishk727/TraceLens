@@ -19,6 +19,8 @@ from app.osint.detectors import (
     html,
     redirect,
     api,
+    tumblr,
+    tryhackme,
 )
 
 from app.osint.detectors.constants import (
@@ -26,6 +28,8 @@ from app.osint.detectors.constants import (
     DETECTOR_HTML,
     DETECTOR_REDIRECT,
     DETECTOR_API,
+    DETECTOR_TUMBLR,
+    DETECTOR_TRYHACKME,
 )
 
 
@@ -42,6 +46,10 @@ DETECTOR_REGISTRY = {
     DETECTOR_REDIRECT: redirect.detect,
 
     DETECTOR_API: api.detect,
+
+    DETECTOR_TUMBLR: tumblr.detect,
+
+    DETECTOR_TRYHACKME: tryhackme.detect,
 
 }
 

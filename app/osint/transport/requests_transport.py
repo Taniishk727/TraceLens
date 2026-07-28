@@ -49,12 +49,19 @@ class RequestsTransport:
 
             elapsed = round(time.time() - start, 2)
 
+            try:
+                json_data = response.json()
+            except Exception:
+                json_data = None
+
             return {
                 "success": True,
                 "status": response.status_code,
                 "final_url": response.url,
                 "headers": dict(response.headers),
                 "html": response.text,
+                "text": response.text,
+                "json": json_data,
                 "length": len(response.text),
                 "elapsed": elapsed,
             }
@@ -67,6 +74,7 @@ class RequestsTransport:
                 "final_url": url,
                 "headers": {},
                 "html": "",
+                "text": "",
                 "length": 0,
                 "elapsed": round(time.time() - start, 2),
                 "json": None

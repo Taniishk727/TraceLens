@@ -208,7 +208,6 @@ SITES = [
     "timeout": 5
 },
 
-# Needs API / HTML Update
 {
     "name": "Instagram",
     "category": "Social Media",
@@ -253,50 +252,47 @@ SITES = [
     "timeout": 5
 },
 
-# Login req for threads
 {
     "name": "Threads",
-    "category": "Social",
-    "url": "https://www.threads.net/@{}",
-    "detector": "html",
-    "transport": "requests",
-    "found": [
-        "threads"
+    "category": "Social Media",
+    "url": "https://www.threads.com/@{}",
+    "detector": "redirect",
+
+    # Threads is a React SPA. Invalid profiles trigger a client-side JS
+    # navigation to /login/?next=... — not an HTTP 3xx redirect.
+    # Only BrowserTransport follows this because it executes JavaScript.
+    # final_url (page.url) will contain "/login/" for non-existent profiles.
+    "transport": "browser",
+
+    "redirect_not_found": [
+        "/login/"
     ],
-    "not_found": [
-        "sorry, this page isn't available"
-    ],
-    "timeout": 5
+
+    "timeout": 15
 },
 
-# TODO: Facebook serves HTTP 400 for public requests.
-# Invalid profiles display a client-side "This content isn't available"
-# page that is not reliably detectable from raw HTML.
-# Revisit with Playwright/browser automation in Phase 2.
 {
     "name": "Facebook",
     "category": "Social",
     "url": "https://www.facebook.com/{}",
     "detector": "html",
-    "transport": "requests",
-
+    "transport": "browser",
     "found": [
-       "follewers"
+        "Followers",
+        "Following"
     ],
 
     "not_found": [
-        "this content isn't available",
-        "this page isn't available",
         "This content isn't available at the moment"
     ],
 
-    "timeout": 5
+    "timeout": 15
 },
 # TODO: LinkedIn aggressively blocks automated requests.
 # Well-known/public profiles may return HTTP 200, while many valid profiles
 # return HTTP 999 (bot protection), making reliable username verification
 # impossible without browser automation or an authenticated session.
-# Revisit in Phase 2 with Playwright.
+# Revisit in Phase 3 with Playwright.
 {
     "name": "LinkedIn",
     "category": "Social",
@@ -320,43 +316,34 @@ SITES = [
     "timeout": 5
 },
 
-# TODO: Pinterest now requires authentication to reliably access profiles.
-# Public requests return a generic/login page, preventing reliable username
-# verification using HTTP status or HTML inspection.
-# Revisit in Phase 2 with browser automation.
 {
     "name": "Pinterest",
     "category": "Social",
     "url": "https://www.pinterest.com/{}/",
     "detector": "html",
-    "transport": "requests",
+    "transport": "browser",
+
+    # Detection is handled by the Pinterest-specific block in html.py.
+    # These markers are kept for documentation purposes only.
     "found": [
-        "followers"
+        "followers",
+        "following"
     ],
+
     "not_found": [
-        "sorry! we couldn't find that page"
+        "show_error=true"
     ],
-    "timeout": 5
+
+    "timeout": 15
 },
 
-# TODO: Tumblr uses browser verification / anti-bot protection.
-# Automated requests receive HTTP 403 before reaching the profile page.
-# Valid profiles load after browser verification, while invalid profiles
-# show "There's nothing here."
-# Revisit in Phase 2 with Playwright/browser automation.
 {
     "name": "Tumblr",
     "category": "Social",
     "url": "https://{}.tumblr.com",
-    "detector": "html",
-    "transport": "requests",
-    "found": [
-        "archive"
-    ],
-    "not_found": [
-        "there's nothing here"
-    ],
-    "timeout": 5
+    "transport": "browser",
+    "detector": "tumblr",
+    "timeout": 30,
 },
 
 {
@@ -408,17 +395,13 @@ SITES = [
         "timeout": 5
     },
 
-# Requires browser automation.
-# Automated requests receive HTTP 429 for both existing and non-existing users.
-# Profiles and "Page Not Found" pages are only accessible after passing browser checks.
     {
         "name": "TryHackMe",
         "category": "Security",
         "url": "https://tryhackme.com/p/{}",
-        "detector": "status",
-        "expected": 200,
-        "transport": "requests",
-        "timeout": 5
+        "transport": "browser",
+        "detector": "tryhackme",
+        "timeout": 15
     },
 
 # Requires authentication.

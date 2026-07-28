@@ -97,6 +97,136 @@ def detect(site, username, transport):
     )
 
     # ----------------------------------------------------
+    # Facebook-specific detection
+    # (Must run before generic marker logic)
+    # ----------------------------------------------------
+
+    if site.get("name") == "Facebook":
+
+        title_raw = response.get("title") or title
+
+        not_found_marker = "this content isn't available at the moment"
+        has_followers     = "followers" in raw_text
+        has_following     = "following" in raw_text
+        title_is_generic  = title_raw.strip().lower() == "facebook"
+        is_not_found      = not_found_marker in raw_text
+
+        print("------------------------------------")
+        print("Facebook Detector")
+        print(f"URL:    {url}")
+        print(f"Status: {status_code}")
+        print(f"Final URL: {response.get('final_url', url)}")
+        print(f"Title:  {title_raw}")
+        print(f"Followers: {has_followers}")
+        print(f"Following: {has_following}")
+        print(f"Not Found Marker: {is_not_found}")
+
+        if is_not_found:
+            print("Decision: NOT_FOUND")
+            print("------------------------------------")
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_NOT_FOUND,
+                status_code=status_code,
+                confidence=CONFIDENCE_HIGH,
+                response_time=elapsed,
+                detector=DISPLAY_HTML,
+            )
+
+        if not title_is_generic and has_followers and has_following:
+            print("Decision: FOUND")
+            print("------------------------------------")
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_FOUND,
+                status_code=status_code,
+                confidence=CONFIDENCE_HIGH,
+                response_time=elapsed,
+                detector=DISPLAY_HTML,
+            )
+
+        print("Decision: UNKNOWN")
+        print("------------------------------------")
+        return build_result(
+            site=site,
+            url=url,
+            status=STATUS_UNKNOWN,
+            status_code=status_code,
+            confidence=CONFIDENCE_UNKNOWN,
+            response_time=elapsed,
+            detector=DISPLAY_HTML,
+            error="Could not determine profile existence from Facebook page",
+        )
+
+    # ----------------------------------------------------
+    # Pinterest-specific detection
+    # (Must run before generic marker logic)
+    # ----------------------------------------------------
+
+    if site.get("name") == "Pinterest":
+
+        final_url = response.get("final_url", url)
+        title_raw = response.get("title") or title
+
+        has_show_error    = "show_error=true" in final_url.lower()
+        title_has_profile = "profile | pinterest" in title_raw.lower() or "pinterest" in title_raw.lower()
+        has_followers     = "followers" in raw_text
+        has_following     = "following" in raw_text
+
+        if has_show_error:
+            decision = "NOT_FOUND"
+        elif title_has_profile and has_followers and has_following:
+            decision = "FOUND"
+        else:
+            decision = "UNKNOWN"
+
+        print("------------------------------------------------\n")
+        print("Pinterest Detector\n")
+        print(f"HTTP Status:\n{status_code}\n")
+        print(f"Final URL:\n{final_url}\n")
+        print(f"Title:\n{title_raw if title_raw else '(empty)'}\n")
+        print(f"Followers:\n{has_followers}\n")
+        print(f"Following:\n{has_following}\n")
+        print(f"show_error=true:\n{has_show_error}\n")
+        print(f"Decision:\n{decision}\n")
+        print("------------------------------------------------")
+
+        if decision == "NOT_FOUND":
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_NOT_FOUND,
+                status_code=status_code,
+                confidence=CONFIDENCE_HIGH,
+                response_time=elapsed,
+                detector=DISPLAY_HTML,
+            )
+
+        if decision == "FOUND":
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_FOUND,
+                status_code=status_code,
+                confidence=CONFIDENCE_HIGH,
+                response_time=elapsed,
+                detector=DISPLAY_HTML,
+            )
+
+        return build_result(
+            site=site,
+            url=url,
+            status=STATUS_UNKNOWN,
+            status_code=status_code,
+            confidence=CONFIDENCE_UNKNOWN,
+            response_time=elapsed,
+            detector=DISPLAY_HTML,
+            error="Could not determine profile existence from Pinterest page",
+        )
+
+    # ----------------------------------------------------
     # HTTP Status
     # ----------------------------------------------------
 

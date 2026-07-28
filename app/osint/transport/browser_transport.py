@@ -31,6 +31,7 @@ Key design decisions
 """
 
 import atexit
+import json
 import queue
 import threading
 import time
@@ -218,8 +219,12 @@ class BrowserTransport:
 
         # ── Adaptive timeout per site ──
         is_instagram = "instagram.com" in url.lower()
+        is_facebook = "facebook.com" in url.lower()
+        is_pinterest = "pinterest.com" in url.lower()
+        is_tumblr = "tumblr.com" in url.lower()
+        is_tryhackme = "tryhackme.com" in url.lower()
         is_heavy = any(h in url.lower() for h in ("replit.com", "hashnode.com"))
-        nav_timeout = 15000 if is_heavy else (12000 if is_instagram else self.timeout)
+        nav_timeout = 60000 if is_tumblr else (15000 if (is_heavy or is_tryhackme) else (12000 if (is_instagram or is_facebook or is_pinterest) else self.timeout))
 
         try:
             # ── Page creation (reusing context, not recreating) ──
@@ -260,6 +265,9 @@ class BrowserTransport:
             popup_start = time.perf_counter()
             unnecessary_wait_warning = None
             fixed_wait_gain = 0.0
+            init_title = ""
+            challenge_detected = False
+            waited_seconds = 0
 
             if is_instagram:
                 # Dismiss login popup if present
@@ -297,6 +305,132 @@ class BrowserTransport:
                     )
                     fixed_wait_gain = (self.wait_time - content_ready_ms) / 1000.0
 
+            elif is_facebook:
+                # ── Step 1: Try standard close-button selectors ──
+                popup_closed = False
+                for selector in (
+                    "div[aria-label='Close']",
+                    "button[aria-label='Close']",
+                    "div[role='dialog'] [aria-label='Close']",
+                    "div[role='dialog'] button",
+                    "button:has-text('Not Now')",
+                    "button:has-text('Close')",
+                ):
+                    try:
+                        loc = page.locator(selector).first
+                        if loc.count() > 0:
+                            loc.click(timeout=1000)
+                            popup_closed = True
+                            break
+                    except Exception:
+                        pass
+
+                # ── Step 2: Escape key fallback ──
+                if not popup_closed:
+                    try:
+                        page.keyboard.press("Escape")
+                        # Give the page a moment to react
+                        page.wait_for_timeout(300)
+                        # Check if any dialog still visible
+                        remaining = page.locator("div[role='dialog']").count()
+                        if remaining == 0:
+                            popup_closed = True
+                    except Exception:
+                        pass
+
+                # ── Step 3: JS removal fallback ──
+                if not popup_closed:
+                    try:
+                        page.evaluate(
+                            """
+                            document.querySelectorAll('[role="dialog"]').forEach(d => d.remove());
+                            document.body.style.overflow = 'auto';
+                            """
+                        )
+                    except Exception:
+                        pass
+
+                # ── Condition-based content wait ──
+                content_start = time.perf_counter()
+                try:
+                    page.wait_for_function(
+                        """() => {
+                            const html = document.documentElement.innerHTML;
+                            return html.includes('Followers') ||
+                                   html.includes("This content isn't available") ||
+                                   html.includes('Following');
+                        }""",
+                        timeout=8000,
+                    )
+                except Exception:
+                    pass
+                content_ready_ms = (time.perf_counter() - content_start) * 1000
+
+                if content_ready_ms < (self.wait_time - 200):
+                    unnecessary_wait_warning = (
+                        f"facebook.com waited {self.wait_time}ms but content "
+                        f"became available after {int(content_ready_ms)}ms."
+                    )
+                    fixed_wait_gain = (self.wait_time - content_ready_ms) / 1000.0
+
+            elif is_pinterest:
+                # Additional wait to allow client-side redirects (e.g. to /?show_error=true) to complete
+                try:
+                    page.wait_for_timeout(2000)
+                except Exception:
+                    pass
+
+            elif is_tumblr:
+                # ── Tumblr anti-bot challenge wait logic ──
+                init_body = ""
+                try:
+                    init_title = page.title()
+                except Exception:
+                    pass
+                try:
+                    init_body = page.locator("body").inner_text()
+                except Exception:
+                    pass
+
+                challenge_detected = (
+                    "Checking your browser" in init_title
+                    or "Checking your browser" in init_body
+                )
+
+                if challenge_detected:
+                    print("[Tumblr]\nChallenge detected")
+                    challenge_start = time.perf_counter()
+                    while (time.perf_counter() - challenge_start) < 30:
+                        page.wait_for_timeout(1000)
+                        waited_seconds += 1
+                        print(f"[Tumblr]\nWaiting... {waited_seconds}s")
+                        try:
+                            curr_title = page.title()
+                            curr_body = page.locator("body").inner_text()
+                        except Exception:
+                            curr_title = ""
+                            curr_body = ""
+                        if (
+                            "Checking your browser" not in curr_title
+                            and "Checking your browser" not in curr_body
+                        ):
+                            break
+                    print("[Tumblr]\nChallenge completed")
+
+                import os
+                if os.getenv("DEBUG", "").lower() in ("1", "true", "yes"):
+                    try:
+                        page.screenshot(path="tumblr_debug.png", full_page=True)
+                    except Exception:
+                        pass
+
+            elif is_tryhackme:
+                # ── TryHackMe rendering wait (~3-5 seconds) ──
+                try:
+                    page.wait_for_timeout(3500)
+                except Exception:
+                    pass
+
             else:
                 # Generic sites: wait for body via selector (no fixed sleep)
                 body_start = time.perf_counter()
@@ -323,6 +457,20 @@ class BrowserTransport:
             html = page.content()
             html_extraction_time = time.perf_counter() - html_start
 
+            body_text = ""
+            try:
+                body_text = page.locator("body").inner_text()
+            except Exception:
+                pass
+
+            og_image = ""
+            try:
+                og_loc = page.locator("meta[property='og:image']")
+                if og_loc.count() > 0:
+                    og_image = og_loc.first.get_attribute("content") or ""
+            except Exception:
+                pass
+
             # ── Record aggregate stats ──
             task_time = time.perf_counter() - start_perf
             with self._lock:
@@ -330,16 +478,28 @@ class BrowserTransport:
                 self._total_task_time += task_time
                 self._task_count += 1
 
+            try:
+                json_data = json.loads(html)
+            except Exception:
+                json_data = None
+
             return {
                 "success": True,
                 "status": response.status if response else None,
                 "final_url": page.url,
                 "title": page.title(),
+                "body": body_text,
+                "og_image": og_image,
                 "headers": dict(response.headers) if response else {},
                 "html": html,
+                "text": html,
+                "json": json_data,
                 "length": len(html),
                 "elapsed": round(time.time() - start_wall, 2),
                 "graphql": graphql,
+                "initial_title": init_title if is_tumblr else page.title(),
+                "challenge_detected": challenge_detected if is_tumblr else False,
+                "challenge_waited_seconds": waited_seconds if is_tumblr else 0,
                 "error": None,
                 "_profile_timing": {
                     "browser_startup": b_startup,

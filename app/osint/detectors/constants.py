@@ -65,6 +65,10 @@ DETECTOR_REDIRECT = "redirect"
 
 DETECTOR_API = "api"
 
+DETECTOR_TUMBLR = "tumblr"
+
+DETECTOR_TRYHACKME = "tryhackme"
+
 
 # ==========================================================
 # DETECTOR DISPLAY NAMES
@@ -77,6 +81,10 @@ DISPLAY_HTML = "HTML"
 DISPLAY_REDIRECT = "Redirect"
 
 DISPLAY_API = "API"
+
+DISPLAY_TUMBLR = "Tumblr"
+
+DISPLAY_TRYHACKME = "TryHackMe"
 
 
 # ==========================================================

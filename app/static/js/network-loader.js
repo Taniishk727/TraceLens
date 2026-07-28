@@ -1,27 +1,31 @@
 /*!
- * TraceLens Network Investigation Loader
- * =======================================
- * Premium full-screen Canvas animation that visualises an OSINT investigation
- * as packets travelling across a live network topology.
- *
+ * TraceLens Network Investigation Loader  (v3 - Professional Edition)
+ * ====================================================================
  * Architecture
  * ------------
- *   CONFIG          – Tuning constants (colours, sizes, timing)
- *   Util            – Pure helpers (maths, colour, canvas)
- *   Node            – Network node data (infra | platform)
- *   Edge            – Directed link between two nodes
- *   Packet          – In-flight investigation request (pooled)
- *   PacketPool      – Zero-allocation pool of N Packet objects
- *   Graph           – Procedural network topology builder
- *   Renderer        – All Canvas draw calls (zero DOM manipulation)
- *   Simulator       – Client-side investigation timing model
- *   Panel           – Right-side DOM progress panel (updated on state change)
- *   Controller      – RAF loop + phase state machine
- *   TraceLensLoader – Public API: start(platforms) / stop()
+ *   CONFIG       - Palette, sizes, timing
+ *   Util         - Pure maths / canvas helpers
+ *   Node         - Network node (infra | platform)
+ *   Edge         - Directed link with transient hot brightening
+ *   Packet       - In-flight packet (pooled, eased motion)
+ *   PacketPool   - Zero-allocation pool
+ *   Graph        - Procedural topology builder
+ *   Renderer     - Canvas2D draw calls (zero DOM side-effects)
+ *   Simulator    - Client-side timing model
+ *   Panel        - Right-side DOM panel (state-change only)
+ *   Controller   - RAF loop + phase state machine + spawn logic
+ *   Loader       - Public API: start / stop
  *
- * Usage (injected by search.html)
- * --------------------------------
- *   window.TraceLensLoader.start(window.TL_PLATFORMS);
+ * Key improvements over v2
+ * ------------------------
+ *   - True 50/50 load-balancing with anti-clump guard (max 3 consecutive)
+ *   - Professional dark palette: #0B1220 bg, #3B82F6 active, #60A5FA packets
+ *   - Short natural trails (8-12 px, quadratic opacity fade)
+ *   - Per-segment transient line brightening (220 ms cool-down)
+ *   - Three-phase eased motion: ease-in -> cruise -> ease-out
+ *   - Jittered spawn intervals (~170-240 ms)
+ *   - Subtle node 1.05x scale on packet pass-through (180 ms)
+ *   - Minimal glow, no neon, no saturated greens/reds
  */
 (function (global) {
   'use strict';
@@ -30,27 +34,46 @@
      CONFIG
      ════════════════════════════════════════════════════════════════════ */
   var CFG = {
-    BG            : '#0B0F14',
-    GRID_COLOR    : 'rgba(0,212,255,0.038)',
-    GRID_SPACING  : 44,
+    BG          : '#0B1220',
+    GRID_COLOR  : 'rgba(96,165,250,0.025)',
+    GRID_SPACING: 44,
 
-    // Node state colours
     NODE: {
-      infra     : '#00bfff',
-      idle      : '#2a3a4a',
-      searching : '#00d4ff',
-      found     : '#22c55e',
-      notFound  : '#ef4444',
-      unknown   : '#f59e0b',
-      error     : '#f97316',
+      infra    : '#60A5FA',
+      idle     : '#243447',
+      searching: '#3B82F6',
+      found    : '#34D399',
+      notFound : '#94A3B8',
+      unknown  : '#FBBF24',
+      error    : '#F87171',
     },
 
-    // Packet colours
-    PKT_REQ : '#00d4ff',   // requests-transport packet
-    PKT_BRW : '#a78bfa',   // browser-transport packet
+    EDGE_INFRA  : '#1E3A5F',
+    EDGE_PLAT   : '#172234',
+    EDGE_HOT    : '#3B82F6',
+    EDGE_HOT_A  : 0.60,
+    EDGE_COOL_MS: 220,
 
-    TRAIL_LEN   : 24,
-    MAX_PACKETS : 20,
+    PKT_COLOR     : '#60A5FA',
+    PKT_RADIUS    : 3.8,
+    PKT_HALO_R    : 10,
+    PKT_HALO_A    : 0.22,
+
+    TRAIL_LEN   : 14,
+    TRAIL_MAX_A : 0.35,
+
+    PKT_SPEED_BASE: 0.032,
+    PKT_SPEED_RAND: 0.016,
+
+    SPAWN_BASE  : 200,
+    SPAWN_JITTER: 70,
+
+    CLUMP_MAX   : 3,
+
+    MAX_PACKETS : 24,
+
+    NODE_SCALE_PEAK : 1.05,
+    NODE_SCALE_MS   : 180,
   };
 
   /* ════════════════════════════════════════════════════════════════════
@@ -68,6 +91,18 @@
 
     easeInOut: function (t) {
       return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    },
+
+    /**
+     * Three-phase easing for full-path progress (0..1):
+     *   0.00-0.15  ease-in  (accelerate away from client)
+     *   0.15-0.85  linear   (cruise through infrastructure)
+     *   0.85-1.00  ease-out (decelerate into destination)
+     */
+    pathEase: function (t) {
+      if (t < 0.15) { var s = t / 0.15; return 0.15 * s * s; }
+      if (t > 0.85) { var s = (t - 0.85) / 0.15; return 0.85 + 0.15 * (1 - (1 - s) * (1 - s)); }
+      return t;
     },
 
     /** Cross-browser rounded rectangle path (no fill/stroke — caller decides). */
@@ -104,16 +139,29 @@
   function Node(id, label, nx, ny, type) {
     this.id       = id;
     this.label    = label;
-    this.nx       = nx;       // normalised [0, 1] within canvas width
-    this.ny       = ny;       // normalised [0, 1] within canvas height
-    this.type     = type;     // 'infra' | 'platform'
-    this.state    = 'idle';   // idle | searching | found | notFound | unknown | error
-    this.alpha    = type === 'infra' ? 1 : 0;   // platforms fade in during run phase
-    this.pulseOff = Math.random() * Math.PI * 2; // per-node pulse phase offset
-    this.ixId     = 'ix_top'; // which IX hub this platform connects through
+    this.nx       = nx;
+    this.ny       = ny;
+    this.type     = type;
+    this.state    = 'idle';
+    this.alpha    = type === 'infra' ? 1 : 0;
+    this.pulseOff = Math.random() * Math.PI * 2;
+    this.ixId     = 'ix_top';
     this.transport= 'requests';
     this.category = '';
+    /* Activation flash state */
+    this.activateT = -9999;
   }
+
+  Node.prototype.triggerActivation = function (now) { this.activateT = now; };
+
+  /** 1.0 -> 1.05 -> 1.0 triangle over NODE_SCALE_MS */
+  Node.prototype.computeScale = function (now) {
+    var age = now - this.activateT;
+    if (age < 0 || age > CFG.NODE_SCALE_MS) return 1.0;
+    var t = age / CFG.NODE_SCALE_MS;
+    var tri = t < 0.5 ? t * 2 : (1 - t) * 2;
+    return 1.0 + (CFG.NODE_SCALE_PEAK - 1.0) * tri;
+  };
 
   Node.prototype.radius = function () { return this.type === 'infra' ? 10 : 7; };
 
@@ -127,36 +175,43 @@
      EDGE
      ════════════════════════════════════════════════════════════════════ */
   function Edge(a, b) {
-    this.a     = a;
-    this.b     = b;
-    // Infra–infra edges start drawing immediately; platform edges wait for node fade-in
-    this.drawn = (a.type === 'infra' && b.type === 'infra') ? 0 : 1;
-    this.alpha = (a.type === 'infra' && b.type === 'infra') ? 1 : 0;
+    this.a        = a;
+    this.b        = b;
+    this.drawn    = (a.type === 'infra' && b.type === 'infra') ? 0 : 1;
+    this.alpha    = (a.type === 'infra' && b.type === 'infra') ? 1 : 0;
+    this.hotUntil = -1;  // timestamp: edge stays bright until this time
   }
+
+  Edge.prototype.touch = function (now) { this.hotUntil = now + CFG.EDGE_COOL_MS; };
 
   /* ════════════════════════════════════════════════════════════════════
      PACKET  (pooled — never constructed during the animation loop)
      ════════════════════════════════════════════════════════════════════ */
   function Packet() {
     this.alive    = false;
-    this.progress = 0;       // 0 … path.length-1
-    this.path     = [];      // array of Node objects (forward + return)
+    this.rawProg  = 0;      // 0..1 normalised (drives pathEase)
+    this.progress = 0;      // 0..path.length-1 eased
+    this.path     = [];
+    this.edges    = [];     // edge parallel array for hot-marking
     this.x        = 0;
     this.y        = 0;
-    this.color    = CFG.PKT_REQ;
-    this.speed    = 0.04;    // progress units per 60-fps frame
-    // Ring-buffer trail — never resized after construction
+    this.color    = CFG.PKT_COLOR;
+    this.speed    = CFG.PKT_SPEED_BASE;
+    this.radius   = CFG.PKT_RADIUS;
     this.trail    = [];
     this.trailHead= 0;
     for (var i = 0; i < CFG.TRAIL_LEN; i++) this.trail.push({ x: 0, y: 0 });
   }
 
-  Packet.prototype.reset = function (path, color, speed) {
+  Packet.prototype.reset = function (path, edges, speed) {
     this.alive     = true;
+    this.rawProg   = 0;
     this.progress  = 0;
     this.path      = path;
-    this.color     = color;
-    this.speed     = speed || 0.04;
+    this.edges     = edges;
+    this.color     = CFG.PKT_COLOR;
+    this.speed     = speed || CFG.PKT_SPEED_BASE;
+    this.radius    = CFG.PKT_RADIUS + (Math.random() - 0.5) * 0.6;
     this.trailHead = 0;
     for (var i = 0; i < this.trail.length; i++) {
       this.trail[i].x = 0;
@@ -196,11 +251,11 @@
   */
   var Graph = {
     build: function (platforms) {
-      var nodes = {};   // id → Node
-      var all   = [];   // flat list for iteration
-      var edges = [];
+      var nodes   = {};
+      var all     = [];
+      var edges   = [];
+      var edgeMap = {};   // 'a|b' and 'b|a' -> Edge (for hot-marking)
 
-      /* ── helpers ── */
       function mk(id, label, nx, ny, type) {
         var n = new Node(id, label, nx, ny, type);
         nodes[id] = n;
@@ -208,7 +263,12 @@
         return n;
       }
       function link(aid, bid) {
-        if (nodes[aid] && nodes[bid]) edges.push(new Edge(nodes[aid], nodes[bid]));
+        if (nodes[aid] && nodes[bid]) {
+          var e = new Edge(nodes[aid], nodes[bid]);
+          edges.push(e);
+          edgeMap[aid + '|' + bid] = e;
+          edgeMap[bid + '|' + aid] = e;
+        }
       }
 
       /* ── infrastructure backbone ── */
@@ -288,7 +348,7 @@
         });
       });
 
-      return { nodes: nodes, all: all, edges: edges };
+      return { nodes: nodes, all: all, edges: edges, edgeMap: edgeMap };
     },
   };
 
@@ -312,16 +372,14 @@
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
 
-  /** Convert normalised node coords to canvas pixels. */
-  Renderer.prototype.nx = function (n) { return n * this.w; };
-  Renderer.prototype.ny = function (n) { return n * this.h; };
+  Renderer.prototype.px = function (n) { return n * this.w; };
+  Renderer.prototype.py = function (n) { return n * this.h; };
 
   Renderer.prototype.clear = function () {
     var ctx = this.ctx;
     ctx.fillStyle = CFG.BG;
     ctx.fillRect(0, 0, this.w, this.h);
-
-    // Subtle dot grid
+    ctx.globalAlpha = 1;
     ctx.strokeStyle = CFG.GRID_COLOR;
     ctx.lineWidth   = 1;
     ctx.beginPath();
@@ -331,19 +389,27 @@
     ctx.stroke();
   };
 
-  Renderer.prototype.drawEdge = function (edge) {
+  Renderer.prototype.drawEdge = function (edge, now) {
     if (edge.alpha < 0.01) return;
     var ctx  = this.ctx;
-    var ax   = this.nx(edge.a.nx), ay = this.ny(edge.a.ny);
-    var bx   = this.nx(edge.b.nx), by = this.ny(edge.b.ny);
+    var ax   = this.px(edge.a.nx), ay = this.py(edge.a.ny);
+    var bx   = this.px(edge.b.nx), by = this.py(edge.b.ny);
     var prog = Util.clamp(edge.drawn, 0, 1);
     var ex   = ax + (bx - ax) * prog;
     var ey   = ay + (by - ay) * prog;
 
     var isInfra = edge.a.type === 'infra' && edge.b.type === 'infra';
-    ctx.globalAlpha = edge.alpha * (isInfra ? 0.65 : 0.40);
-    ctx.strokeStyle = isInfra ? '#1e3a5f' : '#0f2235';
-    ctx.lineWidth   = isInfra ? 1.5 : 1;
+
+    /* Hotness: 0=cool, 1=freshly touched */
+    var hot = 0;
+    if (edge.hotUntil > 0 && now < edge.hotUntil) {
+      hot = Util.clamp((edge.hotUntil - now) / CFG.EDGE_COOL_MS, 0, 1);
+    }
+
+    var baseA   = isInfra ? 0.55 : 0.30;
+    ctx.globalAlpha = edge.alpha * Util.lerp(baseA, CFG.EDGE_HOT_A, hot);
+    ctx.strokeStyle = hot > 0.05 ? CFG.EDGE_HOT : (isInfra ? CFG.EDGE_INFRA : CFG.EDGE_PLAT);
+    ctx.lineWidth   = isInfra ? Util.lerp(1.5, 2.2, hot) : Util.lerp(1.0, 1.6, hot);
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(ax, ay);
@@ -355,64 +421,66 @@
   Renderer.prototype.drawNode = function (node, now) {
     if (node.alpha < 0.02) return;
     var ctx   = this.ctx;
-    var x     = this.nx(node.nx);
-    var y     = this.ny(node.ny);
-    var r     = node.radius();
+    var scale = node.computeScale(now);
+    var x     = this.px(node.nx);
+    var y     = this.py(node.ny);
+    var r     = node.radius() * scale;
     var col   = node.color();
-    var pulse = Math.sin(now * 0.0018 + node.pulseOff) * 0.5 + 0.5;
+    var pulse = Math.sin(now * 0.0016 + node.pulseOff) * 0.5 + 0.5;
 
     ctx.globalAlpha = node.alpha;
 
-    /* ── glow (only for non-idle / infrastructure) ── */
-    if (node.state !== 'idle' || node.type === 'infra') {
-      var gr     = r * 4 + pulse * r * 2;
-      var ga     = node.type === 'infra' ? 0.10 : (node.state === 'searching' ? 0.30 : 0.18);
-      var grd    = ctx.createRadialGradient(x, y, 0, x, y, gr);
-      grd.addColorStop(0, Util.hexToRgba(col, ga));
+    /* Subtle glow - restrained, only infra or non-idle */
+    if (node.type === 'infra' || node.state !== 'idle') {
+      var glowR  = r * 3.5 + pulse * r;
+      var age    = now - node.activateT;
+      var flash  = (age >= 0 && age < CFG.NODE_SCALE_MS)
+                   ? Util.clamp(1 - age / CFG.NODE_SCALE_MS, 0, 1) : 0;
+      var gaBase = node.type === 'infra' ? 0.08 : (node.state === 'searching' ? 0.18 : 0.10);
+      var ga     = gaBase + flash * 0.14;
+      var grd    = ctx.createRadialGradient(x, y, 0, x, y, glowR);
+      grd.addColorStop(0, Util.hexToRgba(col, ga * 2));
       grd.addColorStop(1, 'transparent');
       ctx.fillStyle = grd;
       ctx.beginPath();
-      ctx.arc(x, y, gr, 0, Math.PI * 2);
+      ctx.arc(x, y, glowR, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    /* ── pulsing search ring ── */
+    /* Single thin searching ring - no flashy pulse */
     if (node.state === 'searching') {
-      var ringR = r + 5 + pulse * 9;
-      ctx.globalAlpha = node.alpha * (0.75 - pulse * 0.55);
+      var ringR = r + 4 + pulse * 5;
+      ctx.globalAlpha = node.alpha * (0.45 - pulse * 0.30);
       ctx.strokeStyle = col;
-      ctx.lineWidth   = 1.2;
+      ctx.lineWidth   = 1;
       ctx.beginPath();
       ctx.arc(x, y, ringR, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = node.alpha;
     }
 
-    /* ── circle body ── */
-    ctx.fillStyle = node.type === 'infra' ? '#0f1e30' : '#0c1825';
+    ctx.fillStyle   = node.type === 'infra' ? '#0F1E30' : '#0C1825';
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = node.type === 'infra' ? 2 : 1.5;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = node.type === 'infra' ? 2 : 1.5;
     ctx.stroke();
 
-    /* ── infra inner pulse dot ── */
     if (node.type === 'infra') {
       ctx.fillStyle   = col;
-      ctx.globalAlpha = node.alpha * (0.5 + pulse * 0.5);
+      ctx.globalAlpha = node.alpha * (0.45 + pulse * 0.35);
       ctx.beginPath();
-      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.arc(x, y, 2.8, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = node.alpha;
     }
 
-    /* ── label ── */
     var fs = node.type === 'infra' ? 10 : 9;
-    ctx.font      = 'bold ' + fs + 'px Inter,monospace';
-    ctx.fillStyle = 'rgba(180,210,240,' + (node.alpha * 0.85) + ')';
+    ctx.font      = fs + 'px Inter,monospace';
+    ctx.fillStyle = 'rgba(148,180,215,' + (node.alpha * 0.75) + ')';
     ctx.textAlign = 'center';
-    ctx.fillText(node.label, x, y + r + 14);
+    ctx.fillText(node.label, x, y + r + 13);
 
     ctx.globalAlpha = 1;
     ctx.textAlign   = 'left';
@@ -424,14 +492,15 @@
     var col  = pkt.color;
     var tlen = pkt.trail.length;
 
-    /* ── fading trail (ring buffer, no allocation) ── */
+    /* Short quadratic-fade trail */
     for (var i = 1; i < tlen; i++) {
       var ti = (pkt.trailHead - i + tlen * 2) % tlen;
       var pt = pkt.trail[ti];
       if (pt.x === 0 && pt.y === 0) continue;
-      var ta = (1 - i / tlen) * 0.45;
-      var ts = 3.5 * (1 - i / tlen);
-      if (ts < 0.4) continue;
+      var frac = 1 - i / tlen;
+      var ta   = frac * frac * CFG.TRAIL_MAX_A;
+      var ts   = pkt.radius * frac * 0.75;
+      if (ts < 0.3) continue;
       ctx.globalAlpha = ta;
       ctx.fillStyle   = col;
       ctx.beginPath();
@@ -440,61 +509,58 @@
     }
     ctx.globalAlpha = 1;
 
-    /* ── glow halo ── */
-    var halo = ctx.createRadialGradient(pkt.x, pkt.y, 0, pkt.x, pkt.y, 14);
-    halo.addColorStop(0, Util.hexToRgba(col, 0.45));
+    /* Very subtle halo */
+    var hr   = CFG.PKT_HALO_R;
+    var halo = ctx.createRadialGradient(pkt.x, pkt.y, 0, pkt.x, pkt.y, hr);
+    halo.addColorStop(0, Util.hexToRgba(col, CFG.PKT_HALO_A));
     halo.addColorStop(1, 'transparent');
     ctx.fillStyle   = halo;
-    ctx.globalAlpha = 0.75;
+    ctx.globalAlpha = 0.9;
     ctx.beginPath();
-    ctx.arc(pkt.x, pkt.y, 14, 0, Math.PI * 2);
+    ctx.arc(pkt.x, pkt.y, hr, 0, Math.PI * 2);
     ctx.fill();
 
-    /* ── core dot + white centre ── */
+    /* Core dot */
     ctx.globalAlpha = 1;
     ctx.fillStyle   = col;
     ctx.beginPath();
-    ctx.arc(pkt.x, pkt.y, 4.5, 0, Math.PI * 2);
+    ctx.arc(pkt.x, pkt.y, pkt.radius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
+
+    /* Bright pinpoint centre */
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath();
-    ctx.arc(pkt.x, pkt.y, 1.7, 0, Math.PI * 2);
+    ctx.arc(pkt.x, pkt.y, pkt.radius * 0.38, 0, Math.PI * 2);
     ctx.fill();
   };
 
   Renderer.prototype.drawHUD = function (done, total, elapsed) {
     var ctx = this.ctx;
-    var bx  = 20, by = this.h - 38, bw = Math.min(this.w * 0.54, 480), bh = 4;
+    var bx  = 20, by = this.h - 38, bw = Math.min(this.w * 0.54, 480), bh = 3;
 
-    /* ── bar background ── */
-    Util.roundRectPath(ctx, bx, by, bw, bh, 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    Util.roundRectPath(ctx, bx, by, bw, bh, 1.5);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fill();
 
-    /* ── bar fill ── */
     var pct = total > 0 ? done / total : 0;
     if (pct > 0.001) {
-      Util.roundRectPath(ctx, bx, by, bw * pct, bh, 2);
+      Util.roundRectPath(ctx, bx, by, bw * pct, bh, 1.5);
       var fg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-      fg.addColorStop(0, '#00d4ff');
-      fg.addColorStop(1, '#006eff');
+      fg.addColorStop(0, '#3B82F6');
+      fg.addColorStop(1, '#60A5FA');
       ctx.fillStyle = fg;
       ctx.fill();
-
-      /* leading-edge glow */
-      var ex  = bx + bw * pct;
-      var eg  = ctx.createRadialGradient(ex, by + 2, 0, ex, by + 2, 8);
-      eg.addColorStop(0, 'rgba(0,212,255,0.75)');
-      eg.addColorStop(1, 'transparent');
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle   = eg;
-      ctx.fillRect(ex - 8, by - 4, 16, 12);
+      var ex = bx + bw * pct;
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle   = '#93C5FD';
+      ctx.beginPath();
+      ctx.arc(ex, by + 1.5, 3.5, 0, Math.PI * 2);
+      ctx.fill();
       ctx.globalAlpha = 1;
     }
 
-    /* ── text labels ── */
-    ctx.font      = '11px Inter,sans-serif';
-    ctx.fillStyle = 'rgba(0,212,255,0.65)';
+    ctx.font      = '10px Inter,sans-serif';
+    ctx.fillStyle = 'rgba(96,165,250,0.55)';
     ctx.textAlign = 'left';
     ctx.fillText(done + ' / ' + total + ' platforms', bx, by - 8);
     ctx.textAlign = 'right';
@@ -507,25 +573,21 @@
     var ctx = this.ctx;
     ctx.globalAlpha = alpha;
 
-    /* shield dot */
-    ctx.fillStyle = '#00d4ff';
+    ctx.fillStyle = '#3B82F6';
     ctx.beginPath();
     ctx.arc(24, 38, 5, 0, Math.PI * 2);
     ctx.fill();
 
-    /* wordmark */
     ctx.font      = 'bold 20px Inter,sans-serif';
-    ctx.fillStyle = '#00d4ff';
+    ctx.fillStyle = '#60A5FA';
     ctx.textAlign = 'left';
     ctx.fillText('Trace', 36, 44);
-
     var tw = ctx.measureText('Trace').width;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#E2E8F0';
     ctx.fillText('Lens', 36 + tw, 44);
 
-    /* subtitle */
     ctx.font      = '10px Inter,sans-serif';
-    ctx.fillStyle = 'rgba(0,212,255,0.45)';
+    ctx.fillStyle = 'rgba(96,165,250,0.40)';
     ctx.fillText('OSINT INVESTIGATION ENGINE', 36, 60);
 
     ctx.globalAlpha = 1;
@@ -600,49 +662,34 @@
 
     build: function (root, platforms) {
       this._items = {};
-
       var h = '';
-
-      /* header */
       h += '<div style="margin-bottom:22px">';
-      h += '<div style="font-size:10px;letter-spacing:2px;color:rgba(0,212,255,.42);margin-bottom:5px;font-family:Inter,sans-serif">TRACELENS</div>';
-      h += '<div style="font-size:17px;font-weight:700;color:#fff;font-family:Inter,sans-serif">Active Investigation</div>';
+      h += '<div style="font-size:10px;letter-spacing:2px;color:rgba(96,165,250,.38);margin-bottom:5px;font-family:Inter,sans-serif">TRACELENS</div>';
+      h += '<div style="font-size:17px;font-weight:700;color:#E2E8F0;font-family:Inter,sans-serif">Active Investigation</div>';
       h += '</div>';
-
-      /* stat cards */
       h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:18px">';
-      h += Panel._card('tl-st-el',  'ELAPSED',  '0.0s');
-      h += Panel._card('tl-st-dn',  'DONE',     '0');
-      h += Panel._card('tl-st-pk',  'PACKETS',  '0');
+      h += Panel._card('tl-st-el', 'ELAPSED', '0.0s');
+      h += Panel._card('tl-st-dn', 'DONE',    '0');
+      h += Panel._card('tl-st-pk', 'PACKETS', '0');
       h += '</div>';
-
-      /* progress bar */
       h += '<div style="margin-bottom:16px">';
-      h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(140,170,200,.5);margin-bottom:6px;font-family:Inter,sans-serif">';
+      h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(148,163,184,.45);margin-bottom:6px;font-family:Inter,sans-serif">';
       h += '<span>Progress</span><span id="tl-st-pct">0%</span></div>';
-      h += '<div style="height:3px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden">';
-      h += '<div id="tl-pbar" style="height:100%;width:0;background:linear-gradient(90deg,#00d4ff,#006eff);border-radius:99px;transition:width .35s ease"></div>';
+      h += '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden">';
+      h += '<div id="tl-pbar" style="height:100%;width:0;background:linear-gradient(90deg,#3B82F6,#60A5FA);border-radius:99px;transition:width .35s ease"></div>';
       h += '</div></div>';
-
-      /* divider */
-      h += '<div style="height:1px;background:rgba(0,212,255,.07);margin-bottom:14px"></div>';
-
-      /* platform list */
-      h += '<div style="font-size:10px;letter-spacing:1.5px;color:rgba(0,212,255,.38);margin-bottom:10px;font-family:Inter,sans-serif">PLATFORMS</div>';
+      h += '<div style="height:1px;background:rgba(96,165,250,.07);margin-bottom:14px"></div>';
+      h += '<div style="font-size:10px;letter-spacing:1.5px;color:rgba(96,165,250,.34);margin-bottom:10px;font-family:Inter,sans-serif">PLATFORMS</div>';
       h += '<div id="tl-plat-list" style="display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex:1">';
-
       platforms.forEach(function (p) {
         var sid = Util.safeId(p.name);
         h += '<div id="' + sid + '" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:5px;font-family:Inter,sans-serif">';
         h += '<span class="tl-ic">' + Panel.ICONS.idle + '</span>';
-        h += '<span style="font-size:11px;color:rgba(150,180,210,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + Util.htmlEsc(p.name) + '</span>';
+        h += '<span style="font-size:11px;color:rgba(148,163,184,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + Util.htmlEsc(p.name) + '</span>';
         h += '</div>';
       });
-
       h += '</div>';
       root.innerHTML = h;
-
-      /* cache element references */
       platforms.forEach(function (p) {
         var el = document.getElementById(Util.safeId(p.name));
         if (el) Panel._items[p.name] = el;
@@ -650,45 +697,42 @@
     },
 
     ICONS: {
-      idle: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" fill="rgba(140, 165, 190, 0.5)"/></svg>',
-      searching: '<svg class="tl-spin" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#00d4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.5v3.5l2.5 1.5"/></svg>',
-      done: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" fill="rgba(120, 140, 165, 0.4)"/></svg>'
+      idle     : '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" fill="rgba(100,116,139,0.45)"/></svg>',
+      searching: '<svg class="tl-spin" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#60A5FA" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.5v3.5l2.5 1.5"/></svg>',
+      done     : '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" fill="rgba(100,116,139,0.3)"/></svg>',
     },
 
     _card: function (id, label, val) {
-      return '<div style="background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.1);border-radius:8px;padding:8px 10px">' +
-             '<div style="font-size:9px;color:rgba(0,212,255,.4);font-family:Inter,sans-serif;margin-bottom:3px">' + label + '</div>' +
-             '<div id="' + id + '" style="font-size:15px;font-weight:700;color:#00d4ff;font-family:monospace">' + val + '</div>' +
+      return '<div style="background:rgba(59,130,246,.04);border:1px solid rgba(59,130,246,.12);border-radius:8px;padding:8px 10px">' +
+             '<div style="font-size:9px;color:rgba(96,165,250,.38);font-family:Inter,sans-serif;margin-bottom:3px">' + label + '</div>' +
+             '<div id="' + id + '" style="font-size:15px;font-weight:700;color:#60A5FA;font-family:monospace">' + val + '</div>' +
              '</div>';
     },
 
     updatePlatform: function (name, status) {
       var el = Panel._items[name];
       if (!el) return;
-
-      var isSearching = (status === 'searching');
-      var isDone = (status === 'found' || status === 'notFound' || status === 'unknown' || status === 'error');
-
+      var isSearching = status === 'searching';
+      var isDone      = status === 'found' || status === 'notFound' || status === 'unknown' || status === 'error';
       var ic = el.querySelector('.tl-ic');
       var tx = el.querySelector('span:last-child');
       if (!ic || !tx) return;
-
       if (isSearching) {
-        el.style.background = 'rgba(0, 212, 255, 0.08)';
+        el.style.background = 'rgba(59,130,246,0.07)';
         ic.innerHTML = Panel.ICONS.searching;
-        tx.style.color = '#00d4ff';
+        tx.style.color = '#93C5FD';
         tx.style.fontWeight = '600';
         tx.style.opacity = '1';
       } else if (isDone) {
-        el.style.background = 'rgba(255, 255, 255, 0.015)';
+        el.style.background = 'rgba(255,255,255,0.012)';
         ic.innerHTML = Panel.ICONS.done;
-        tx.style.color = 'rgba(120, 140, 165, 0.5)';
+        tx.style.color = 'rgba(100,116,139,0.5)';
         tx.style.fontWeight = '400';
-        tx.style.opacity = '0.6';
+        tx.style.opacity = '0.55';
       } else {
         el.style.background = 'transparent';
         ic.innerHTML = Panel.ICONS.idle;
-        tx.style.color = 'rgba(150, 180, 210, 0.7)';
+        tx.style.color = 'rgba(148,163,184,0.65)';
         tx.style.fontWeight = '400';
         tx.style.opacity = '0.85';
       }
@@ -709,29 +753,32 @@
      Phases: fadein → infra → running
      ════════════════════════════════════════════════════════════════════ */
   function Controller(canvas, platforms) {
-    this.R       = new Renderer(canvas);
-    this.pool    = new PacketPool(CFG.MAX_PACKETS);
-    this.G       = null;
-    this.sim     = null;
-    this.raf     = null;
+    this.R      = new Renderer(canvas);
+    this.pool   = new PacketPool(CFG.MAX_PACKETS);
+    this.G      = null;
+    this.sim    = null;
+    this.raf    = null;
 
-    this.phase   = 'fadein';  // fadein | infra | running
-    this.t0      = 0;
-    this.last    = 0;
-    this.phaseT  = 0;
+    this.phase  = 'fadein';
+    this.t0     = 0;
+    this.last   = 0;
+    this.phaseT = 0;
 
     this.logoAlpha = 0;
     this.done      = 0;
     this.total     = platforms.length;
     this.platforms = platforms;
 
-    /* pending event queues (simulator → controller) */
-    this._starts  = [];
-    this._dones   = [];
+    this._starts = [];
+    this._dones  = [];
 
-    /* external hooks (controller → panel) */
     this.onPlatformStart    = null;
     this.onPlatformComplete = null;
+
+    /* Load-balancer state */
+    this._bgSpawnAt = 0;
+    this._lastIx    = null;
+    this._consec    = 0;
 
     this._tick = this._tick.bind(this);
   }
@@ -758,13 +805,9 @@
     this.last = now;
     var elapsed = now - this.t0;
 
-    /* advance simulation */
     this.sim.tick(now);
+    this._flushEvents(now);
 
-    /* drain event queues */
-    this._flushEvents();
-
-    /* phase state machine */
     if (this.phase === 'fadein') {
       this.logoAlpha = Util.clamp(elapsed / 550, 0, 1);
       if (elapsed > 750) { this.phase = 'infra'; this.phaseT = now; }
@@ -777,24 +820,27 @@
           e.drawn = Util.clamp(e.drawn + dt * 0.0022, 0, 1);
         }
       });
-      if (et > 950) { this.phase = 'running'; this.phaseT = now; this.sim.start(); }
+      if (et > 950) {
+        this.phase  = 'running';
+        this.phaseT = now;
+        this.sim.start();
+        this._bgSpawnAt = now + 300;
+      }
 
     } else if (this.phase === 'running') {
-      /* fade in platform nodes */
       this.G.all.forEach(function (n) {
         if (n.type === 'platform' && n.alpha < 1) {
           n.alpha = Util.clamp(n.alpha + dt * 0.0014, 0, 1);
         }
       });
-      /* animate platform edge draw-on (triggered once node is visible) */
       this.G.edges.forEach(function (e) {
         if (e.b.type === 'platform' && e.b.alpha > 0.2) {
           e.alpha = Util.clamp(e.alpha + dt * 0.004, 0, 1);
           e.drawn = Util.clamp(e.drawn + dt * 0.005, 0, 1);
         }
       });
-      /* update live packets */
-      this._updatePackets(dt);
+      this._spawnAmbient(now);
+      this._updatePackets(dt, now);
     }
 
     /* render frame */
@@ -802,19 +848,16 @@
     this.raf = requestAnimationFrame(this._tick);
   };
 
-  Controller.prototype._flushEvents = function () {
-    var self = this;
-
+  Controller.prototype._flushEvents = function (now) {
     while (this._starts.length) {
       var p    = this._starts.shift();
       var node = this.G.nodes[p.name];
       if (node) {
         node.state = 'searching';
-        this._spawn(node, p.transport === 'browser' ? CFG.PKT_BRW : CFG.PKT_REQ);
+        this._spawnToTarget(node, now);
       }
       if (this.onPlatformStart) this.onPlatformStart(p);
     }
-
     while (this._dones.length) {
       var ev   = this._dones.shift();
       var node = this.G.nodes[ev.p.name];
@@ -824,68 +867,115 @@
     }
   };
 
-  Controller.prototype._spawn = function (target, color) {
+  /* 50/50 IX selection with anti-clump guard */
+  Controller.prototype._chooseIx = function () {
+    var candidate = Math.random() < 0.5 ? 'ix_top' : 'ix_bot';
+    if (candidate === this._lastIx && this._consec >= CFG.CLUMP_MAX) {
+      candidate = (this._lastIx === 'ix_top') ? 'ix_bot' : 'ix_top';
+    }
+    if (candidate === this._lastIx) { this._consec++; }
+    else { this._consec = 1; this._lastIx = candidate; }
+    return candidate;
+  };
+
+  /* Build edge-parallel array for hot-marking */
+  Controller.prototype._buildEdgeList = function (path) {
+    var em = this.G.edgeMap, eList = [];
+    for (var i = 0; i < path.length - 1; i++) {
+      eList.push(em[path[i].id + '|' + path[i + 1].id] || null);
+    }
+    return eList;
+  };
+
+  /* Spawn packet toward a specific target (event-driven) */
+  Controller.prototype._spawnToTarget = function (target, now) {
     var pkt = this.pool.acquire();
     if (!pkt) return;
-
-    var nm  = this.G.nodes;
+    var nm   = this.G.nodes;
     var ixId = target.ixId || 'ix_top';
-
-    /* forward path: user → gw → isp → core → IX → target */
-    var fwd = ['user', 'gw', 'isp', 'core', ixId, target.id];
-    /* return path: target → IX → core → isp → gw → user */
-    var rev = [target.id, ixId, 'core', 'isp', 'gw', 'user'];
-
+    var fwd  = ['user', 'gw', 'isp', 'core', ixId, target.id];
+    var rev  = [target.id, ixId, 'core', 'isp', 'gw', 'user'];
     var path = [];
     fwd.forEach(function (id) { var n = nm[id]; if (n) path.push(n); });
     rev.slice(1).forEach(function (id) { var n = nm[id]; if (n) path.push(n); });
-
     if (path.length < 2) return;
-    pkt.reset(path, color, 0.024 + Math.random() * 0.018);
+    pkt.reset(path, this._buildEdgeList(path),
+              CFG.PKT_SPEED_BASE + (Math.random() - 0.5) * CFG.PKT_SPEED_RAND);
   };
 
-  Controller.prototype._updatePackets = function (dt) {
-    var R  = this.R;
-    var lu = Util;
-    this.pool.pool.forEach(function (pkt) {
-      if (!pkt.alive) return;
+  /* Jittered ambient spawner - load-balanced across both IX nodes */
+  Controller.prototype._spawnAmbient = function (now) {
+    if (now < this._bgSpawnAt) return;
+    this._bgSpawnAt = now + CFG.SPAWN_BASE + (Math.random() - 0.5) * CFG.SPAWN_JITTER;
+    var visible = [];
+    for (var i = 0; i < this.G.all.length; i++) {
+      if (this.G.all[i].type === 'platform' && this.G.all[i].alpha > 0.5) visible.push(this.G.all[i]);
+    }
+    if (!visible.length) return;
+    var target = visible[Math.floor(Math.random() * visible.length)];
+    var pkt    = this.pool.acquire();
+    if (!pkt) return;
+    var ixId = this._chooseIx();
+    var nm   = this.G.nodes;
+    var fwd  = ['user', 'gw', 'isp', 'core', ixId, target.id];
+    var rev  = [target.id, ixId, 'core', 'isp', 'gw', 'user'];
+    var path = [];
+    fwd.forEach(function (id) { var n = nm[id]; if (n) path.push(n); });
+    rev.slice(1).forEach(function (id) { var n = nm[id]; if (n) path.push(n); });
+    if (path.length < 2) return;
+    pkt.reset(path, this._buildEdgeList(path),
+              CFG.PKT_SPEED_BASE + (Math.random() - 0.5) * CFG.PKT_SPEED_RAND);
+  };
 
-      pkt.progress += pkt.speed * (dt / 1000) * 60;
+  Controller.prototype._updatePackets = function (dt, now) {
+    var R   = this.R;
+    var all = this.pool.pool;
+    for (var pi = 0; pi < all.length; pi++) {
+      var pkt = all[pi];
+      if (!pkt.alive) continue;
       var maxP = pkt.path.length - 1;
+      if (maxP < 1) { pkt.alive = false; continue; }
 
-      if (pkt.progress >= maxP) { pkt.alive = false; return; }
+      /* Advance normalised progress, apply three-phase path easing */
+      pkt.rawProg = Util.clamp(
+        pkt.rawProg + pkt.speed * (dt / 1000) * 60 / maxP, 0, 1);
+      if (pkt.rawProg >= 1) { pkt.alive = false; continue; }
+      var easedProg = Util.pathEase(pkt.rawProg) * maxP;
 
-      var si  = Math.floor(pkt.progress);
-      var st  = lu.easeInOut(pkt.progress - si);
-      var fa  = pkt.path[si];
-      var to  = pkt.path[Math.min(si + 1, maxP)];
+      var si = Math.min(Math.floor(easedProg), maxP - 1);
+      var st = Util.easeInOut(easedProg - si);
+      var fa = pkt.path[si];
+      var to = pkt.path[si + 1] || fa;
 
-      pkt.x = lu.lerp(R.nx(fa.nx), R.nx(to.nx), st);
-      pkt.y = lu.lerp(R.ny(fa.ny), R.ny(to.ny), st);
+      pkt.x = Util.lerp(R.px(fa.nx), R.px(to.nx), st);
+      pkt.y = Util.lerp(R.py(fa.ny), R.py(to.ny), st);
 
-      /* write to ring-buffer trail */
+      /* Mark current edge as hot */
+      var hotEdge = pkt.edges[si] || null;
+      if (hotEdge) hotEdge.touch(now);
+
+      /* Trigger node brightening as packet nears the next node */
+      var frac = easedProg - si;
+      if (frac > 0.85 && to.activateT < now - CFG.NODE_SCALE_MS) {
+        to.triggerActivation(now);
+      }
+
       pkt.trail[pkt.trailHead].x = pkt.x;
       pkt.trail[pkt.trailHead].y = pkt.y;
       pkt.trailHead = (pkt.trailHead + 1) % pkt.trail.length;
-    });
+    }
   };
 
   Controller.prototype._render = function (now, elapsed) {
-    var R    = this.R;
-    var self = this;
-
+    var R = this.R;
     R.clear();
     if (!this.G) return;
-
-    this.G.edges.forEach(function (e)  { R.drawEdge(e);       });
-    this.G.all.forEach(function (n)    { R.drawNode(n, now);  });
-    this.pool.pool.forEach(function (p){ R.drawPacket(p);     });
-
+    this.G.edges.forEach(function (e)   { R.drawEdge(e, now);  });
+    this.G.all.forEach(function (n)     { R.drawNode(n, now);  });
+    this.pool.pool.forEach(function (p) { R.drawPacket(p);     });
     if (this.phase === 'running') {
-      var runSec = (now - this.phaseT) / 1000;
-      R.drawHUD(this.done, this.total, runSec);
+      R.drawHUD(this.done, this.total, (now - this.phaseT) / 1000);
     }
-
     R.drawLogo(this.logoAlpha);
   };
 
@@ -922,17 +1012,16 @@
 
       /* canvas wrapper */
       var cvWrap = document.createElement('div');
-      cvWrap.style.cssText = 'flex:1;min-width:0;background:#0B0F14;overflow:hidden;position:relative';
+      cvWrap.style.cssText = 'flex:1;min-width:0;background:' + CFG.BG + ';overflow:hidden;position:relative';
       var cv = document.createElement('canvas');
       cv.style.cssText = 'display:block;width:100%;height:100%';
       cvWrap.appendChild(cv);
 
-      /* panel */
       var panel = document.createElement('div');
       panel.style.cssText = [
         'width:284px', 'flex-shrink:0',
-        'background:#07101a',
-        'border-left:1px solid rgba(0,212,255,.1)',
+        'background:#07101A',
+        'border-left:1px solid rgba(59,130,246,.1)',
         'padding:22px 18px',
         'display:flex', 'flex-direction:column',
         'overflow:hidden',
