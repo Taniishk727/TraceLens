@@ -108,6 +108,31 @@ def run_detector(site: dict, username: str, profiler: EngineProfiler | None = No
     wrapper = TransportProfilerWrapper(transport)
     result = detector(site=site, username=username, transport=wrapper)
 
+    # Check for Cloudflare 403 challenge response and fallback to BrowserTransport
+    last_resp = wrapper.last_fetch_info.get("response", {})
+    is_cf_403 = (
+        transport_name == "requests"
+        and (
+            last_resp.get("is_cloudflare_challenge")
+            or (
+                last_resp.get("status") == 403
+                and (
+                    site.get("name", "").lower() == "leetcode"
+                    or "cloudflare" in str(last_resp.get("headers", {})).lower()
+                )
+            )
+        )
+    )
+
+    if is_cf_403:
+        import os
+        if os.getenv("DEBUG", "").lower() in ("1", "true", "yes"):
+            print(f"[Username Module DEBUG] Cloudflare 403 challenge detected for {site['name']}. Falling back to BrowserTransport.")
+
+        browser_wrapper = TransportProfilerWrapper(BROWSER_TRANSPORT)
+        result = detector(site=site, username=username, transport=browser_wrapper)
+        wrapper = browser_wrapper
+
     t_end = time.perf_counter()
     total_site_time = t_end - t_start
 

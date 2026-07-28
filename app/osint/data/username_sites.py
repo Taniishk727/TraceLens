@@ -422,36 +422,30 @@ SITES = [
 # Competitive Programming
 # ======================================================
 
-# Protected by Cloudflare.
-# Unauthenticated requests receive HTTP 403 before profile resolution.
-# Actual profile or "user not found" page is only available after the browser completes the Cloudflare challenge.
-# Requires browser automation (Playwright) or an official API.
 {
     "name": "LeetCode",
+    "url": "https://leetcode.com/u/{}",
     "category": "Competitive Programming",
-    "url": "https://leetcode.com/u/{}/",
-    "detector": "status",
-    "transport": "requests",
-    "expected": 200,
-    "timeout": 5
+   "detector": "status",
+      "transport": "requests",
+      "expected": 200,
+      "timeout": 5
 },
 
-# Phase 2 Notes:
-    # HTML markers are present in both raw HTML and parsed text,
-    # but the detector still returns Unknown during concurrent scans.
-    # Revisit after Phase 1 completion. May require browser automation
-    # or deeper investigation into the detector execution path.
 {
     "name": "HackerRank",
     "category": "Coding",
     "url": "https://www.hackerrank.com/profile/{}",
     "detector": "html",
     "transport": "requests",
-    "found": ["Education","Certifications","Badges"],
+    "found": ["Education", "Certifications", "Badges"],
     "not_found": [
-        "We could not find the page you were looking for"
+        "We could not find the page you were looking for",
+        "Something went wrong!",
+        "Some error occured while loading page for you",
+        "Programming Problems and Competitions :: HackerRank",
     ],
-    "timeout": 5
+    "timeout": 15
 },
 # PHASE 2:codechef
 {
@@ -493,10 +487,12 @@ SITES = [
 {
     "name": "GeeksforGeeks",
     "category": "Competitive Programming",
-    "url": "https://auth.geeksforgeeks.org/user/{}/",
-    "detector": "html",
-    "found": [],
-    "not_found": [],
+    "url": "https://www.geeksforgeeks.org/profile/{}",
+    "api_url": "https://authapi.geeksforgeeks.org/api-get/user-profile-info/?handle={}",
+    "detector": "api",
+    "api_mode": "json_field",
+    "json_field": "data",
+    "not_found_status": [400, 404],
     "transport": "requests",
     "timeout": 5
 },

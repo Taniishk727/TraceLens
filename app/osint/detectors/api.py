@@ -123,13 +123,20 @@ def detect(site, username, transport):
     api_mode = site.get("api_mode")
     data = parse_json_response(response)
 
+    not_found_status = site.get("not_found_status", [404])
     decision_reason = ""
+
+    # Check for HTTP status codes indicating NOT_FOUND
+    if status_code in not_found_status:
+        status = STATUS_NOT_FOUND
+        confidence = CONFIDENCE_HIGH
+        decision_reason = f"HTTP status {status_code} in not_found_status"
 
     # ======================================================
     # API MODE : NON EMPTY LIST
     # ======================================================
 
-    if api_mode == "non_empty_list":
+    elif api_mode == "non_empty_list":
 
         if status_code != 200:
             status = STATUS_UNKNOWN

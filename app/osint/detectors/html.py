@@ -226,12 +226,27 @@ def detect(site, username, transport):
             error="Could not determine profile existence from Pinterest page",
         )
 
+    import os
+    debug = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+
+    matched_not_found = [m for m in not_found_markers if m in searchable_text]
+    matched_found = [m for m in found_markers if m in searchable_text]
+
+    if debug:
+        print(f"\n[HTML Detector DEBUG] Site: {site.get('name')} | URL: {url}")
+        print(f"[HTML Detector DEBUG] Downloaded HTML Length: {len(html)}")
+        print(f"[HTML Detector DEBUG] Parsed Text Length: {len(parsed_text)}")
+        print(f"[HTML Detector DEBUG] Detector: {DISPLAY_HTML}")
+        print(f"[HTML Detector DEBUG] NOT_FOUND Marker Matches ({len(matched_not_found)}): {matched_not_found}")
+        print(f"[HTML Detector DEBUG] FOUND Marker Matches ({len(matched_found)}): {matched_found}")
+
     # ----------------------------------------------------
     # HTTP Status
     # ----------------------------------------------------
 
     if status_code in not_found_status:
-
+        if debug:
+            print(f"[HTML Detector DEBUG] Decision: NOT_FOUND (HTTP Status {status_code})")
         return build_result(
             site=site,
             url=url,
@@ -246,38 +261,33 @@ def detect(site, username, transport):
     # Not-found markers
     # ----------------------------------------------------
 
-    for marker in not_found_markers:
-
-        if marker in searchable_text:
-
-            return build_result(
-                site=site,
-                url=url,
-                status=STATUS_NOT_FOUND,
-                status_code=status_code,
-                confidence=CONFIDENCE_MEDIUM,
-                response_time=elapsed,
-                detector=DISPLAY_HTML,
-            )
+    if matched_not_found:
+        if debug:
+            print(f"[HTML Detector DEBUG] Decision: NOT_FOUND (Matched markers: {matched_not_found})")
+        return build_result(
+            site=site,
+            url=url,
+            status=STATUS_NOT_FOUND,
+            status_code=status_code,
+            confidence=CONFIDENCE_MEDIUM,
+            response_time=elapsed,
+            detector=DISPLAY_HTML,
+        )
 
     # ----------------------------------------------------
     # Found markers (Moved BEFORE login detection)
     # ----------------------------------------------------
 
-    matches = 0
-
-    for marker in found_markers:
-
-        if marker in searchable_text:
-            matches += 1
+    matches = len(matched_found)
 
     if matches:
-
         confidence = (
             CONFIDENCE_HIGH
             if matches >= 2
             else CONFIDENCE_MEDIUM
         )
+        if debug:
+            print(f"[HTML Detector DEBUG] Decision: FOUND (Matched markers: {matched_found})")
 
         return build_result(
             site=site,
@@ -294,6 +304,8 @@ def detect(site, username, transport):
     # ----------------------------------------------------
 
     if login_markers and any(marker in searchable_text for marker in login_markers):
+        if debug:
+            print("[HTML Detector DEBUG] Decision: UNKNOWN (Authentication/Login required)")
 
         return build_result(
             site=site,
@@ -309,6 +321,9 @@ def detect(site, username, transport):
     # ----------------------------------------------------
     # Unknown
     # ----------------------------------------------------
+
+    if debug:
+        print("[HTML Detector DEBUG] Decision: UNKNOWN (No HTML markers matched)")
 
     return build_result(
         site=site,
