@@ -10,8 +10,8 @@ Run:
 """
 
 from unittest.mock import Mock
-from app.osint.detectors.api import detect
-from app.osint.data.username_sites import SITES
+from app.osint.modules.username.detectors.api import detect
+from app.osint.modules.username.data.username_sites import SITES
 
 
 def test_geeksforgeeks_api_valid_user():

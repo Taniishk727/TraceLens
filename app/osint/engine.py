@@ -15,10 +15,10 @@ Responsibilities
 """
 # from transport.requests_transport import RequestsTransport
 # from transport.browser_transport import BrowserTransport
-from app.osint.detector import detect_target
-from app.osint.modules import (
-    username,
-    email,
+from app.osint.modules.username.investigation import detect_target
+from app.osint.modules.username import username
+from app.osint.modules.email import engine as email
+from app.osint.parsers import (
     domain,
     ip,
     phone,

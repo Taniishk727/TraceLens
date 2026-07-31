@@ -14,7 +14,7 @@ Author:
 TraceLens
 """
 
-from app.osint.detectors import (
+from app.osint.modules.username.detectors import (
     status,
     html,
     redirect,
@@ -23,7 +23,7 @@ from app.osint.detectors import (
     tryhackme,
 )
 
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.constants import (
     DETECTOR_STATUS,
     DETECTOR_HTML,
     DETECTOR_REDIRECT,

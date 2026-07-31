@@ -6,7 +6,7 @@ TraceLens Status Code Detector
 Determines whether a profile exists using HTTP status codes.
 """
 
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.constants import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_UNKNOWN,
@@ -15,7 +15,7 @@ from app.osint.detectors.constants import (
     CONFIDENCE_LOW,
 )
 
-from app.osint.detectors.common import (
+from app.osint.modules.username.detectors.common import (
     start_timer,
     stop_timer,
     build_result,

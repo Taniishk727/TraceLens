@@ -20,7 +20,7 @@ TraceLens
 
 import time
 
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.constants import (
     STATUS_ERROR,
     DISPLAY_STATUS,
     CONFIDENCE_NONE

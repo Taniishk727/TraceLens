@@ -10,8 +10,8 @@ Run:
 """
 
 from unittest.mock import Mock
-from app.osint.detectors.html import detect
-from app.osint.data.username_sites import SITES
+from app.osint.modules.username.detectors.html import detect
+from app.osint.modules.username.data.username_sites import SITES
 
 
 def test_hackerrank_valid_profile():

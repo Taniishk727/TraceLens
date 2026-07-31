@@ -79,7 +79,374 @@ TraceLens | Investigation Results
     </div>
 
     <!-- ========================================= -->
-    <!-- Summary Cards -->
+    <!-- Conditional Results Section -->
+    <!-- ========================================= -->
+
+    {% if result.type == "email" or result.data.parsed %}
+
+    {% set domain_col = namespace(data=none) %}
+    {% for col in result.data.results %}
+        {% if col.collector == "Domain Collector" %}
+            {% set domain_col.data = col %}
+        {% endif %}
+    {% endfor %}
+
+    <!-- ========================================= -->
+    <!-- Email Investigation View -->
+    <!-- ========================================= -->
+
+    <div class="row g-4">
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+                        Email Summary
+                    </h5>
+
+                    <hr>
+
+                    <ul class="list-group list-group-flush">
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Normalized Email:</span>
+                            <strong>{{ result.data.parsed.email }}</strong>
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Local Part:</span>
+                            <strong>{{ result.data.parsed.local_part }}</strong>
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Domain:</span>
+                            <strong>{{ result.data.parsed.domain }}</strong>
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Provider:</span>
+                            <strong class="text-info">{{ result.data.parsed.provider }}</strong>
+                        </li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-6">
+
+            <div class="card dashboard-card h-100">
+
+                <div class="card-body">
+
+                    <h5>
+                        Domain Intelligence
+                    </h5>
+
+                    <hr>
+
+                    <ul class="list-group list-group-flush">
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Domain Type:</span>
+                            <span class="badge {% if domain_col.data and domain_col.data.domain_type == 'Public' %}bg-primary{% elif domain_col.data and domain_col.data.domain_type == 'Educational' %}bg-info text-dark{% elif domain_col.data and domain_col.data.domain_type == 'Government' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                {{ domain_col.data.domain_type if domain_col.data else result.data.parsed.provider_type|upper }}
+                            </span>
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Mail Provider:</span>
+                            <strong class="text-success">{{ domain_col.data.mail_provider if domain_col.data else "Unknown" }}</strong>
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>MX Present:</span>
+                            <span class="badge {% if domain_col.data and domain_col.data.has_mx %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ "YES (" ~ domain_col.data.mx_count ~ " servers)" if domain_col.data and domain_col.data.has_mx else "NO" }}
+                            </span>
+                        </li>
+
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
+                            <span>Disposable Domain:</span>
+                            <span class="badge {% if result.data.parsed.is_disposable or (domain_col.data and domain_col.data.disposable) %}bg-danger{% else %}bg-success{% endif %}">
+                                {{ "YES" if result.data.parsed.is_disposable or (domain_col.data and domain_col.data.disposable) else "NO" }}
+                            </span>
+                        </li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Email Security Posture Summary Cards -->
+    {% if domain_col.data %}
+    <div class="row g-3 mt-1">
+
+        <div class="col-md-4">
+            <div class="card dashboard-card text-center p-3">
+                <small class="text-secondary">SPF Record</small>
+                <div class="mt-2">
+                    {% if domain_col.data.spf %}
+                    <span class="badge bg-success fs-6">Configured</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark fs-6">Missing</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card dashboard-card text-center p-3">
+                <small class="text-secondary">DMARC Policy</small>
+                <div class="mt-2">
+                    {% if domain_col.data.dmarc %}
+                    <span class="badge bg-success fs-6">Configured</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark fs-6">Missing</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card dashboard-card text-center p-3">
+                <small class="text-secondary">DKIM Availability</small>
+                <div class="mt-2">
+                    {% if "Detected" in domain_col.data.dkim %}
+                    <span class="badge bg-success fs-6">{{ domain_col.data.dkim }}</span>
+                    {% else %}
+                    <span class="badge bg-secondary fs-6">Unknown</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+    {% endif %}
+
+    <!-- Detailed DNS Records Expandable Section -->
+    {% if domain_col.data and domain_col.data.dns %}
+    <div class="card dashboard-card mt-4">
+
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+
+                <h4 class="mb-0">
+                    DNS & Mail Server Records Summary
+                </h4>
+
+                <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#dnsDetailsCollapse" aria-expanded="true" aria-controls="dnsDetailsCollapse">
+                    Toggle DNS Records
+                </button>
+
+            </div>
+
+            <div class="collapse show" id="dnsDetailsCollapse">
+
+                <div class="row g-4 mt-1">
+
+                    <!-- MX Records -->
+                    <div class="col-md-6">
+                        <h6>MX Records (Mail Exchangers)</h6>
+                        {% if domain_col.data.mx_records %}
+                        <div class="table-responsive">
+                            <table class="table table-dark table-sm table-bordered align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Priority</th>
+                                        <th>Mail Host</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mx in domain_col.data.mx_records %}
+                                    <tr>
+                                        <td><span class="badge bg-info text-dark">{{ mx.preference }}</span></td>
+                                        <td><code>{{ mx.exchange }}</code></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-secondary mb-0">No MX records found for domain.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Name Servers -->
+                    <div class="col-md-6">
+                        <h6>NS Records (Name Servers)</h6>
+                        {% if domain_col.data.dns.ns %}
+                        <ul class="mb-0">
+                            {% for ns in domain_col.data.dns.ns %}
+                            <li><code>{{ ns }}</code></li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-secondary mb-0">No NS records returned.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- TXT Records -->
+                    <div class="col-12">
+                        <h6>TXT Records (SPF, Verification & Security)</h6>
+                        {% if domain_col.data.dns.txt %}
+                        <div class="bg-dark p-3 rounded text-break font-monospace small" style="max-height: 200px; overflow-y: auto;">
+                            {% for txt in domain_col.data.dns.txt %}
+                            <div class="mb-1 text-info">> {{ txt }}</div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-secondary mb-0">No TXT records returned.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- A Records -->
+                    <div class="col-12">
+                        <h6>A Records (IPv4 Addresses)</h6>
+                        {% if domain_col.data.dns.a %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for ip in domain_col.data.dns.a %}
+                            <span class="badge bg-dark border border-secondary text-info p-2 font-monospace">{{ ip }}</span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-secondary mb-0">No A records returned.</p>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+    <!-- Email Collectors Pipeline Table -->
+
+    <div class="card dashboard-card mt-4">
+
+        <div class="card-body">
+
+            <h4>
+                Email Collectors Pipeline
+            </h4>
+
+            <hr>
+
+            <div class="table-responsive">
+
+                <table class="table table-dark table-hover align-middle">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Collector</th>
+
+                            <th>Status</th>
+
+                            <th>Findings / Metadata</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for col in result.data.results %}
+
+                        <tr>
+
+                            <td>
+
+                                <strong>{{ col.collector }}</strong>
+
+                            </td>
+
+                            <td>
+
+                                {% if col.status == "completed" or col.status == "success" %}
+
+                                <span class="badge bg-success">Completed</span>
+
+                                {% elif col.status == "placeholder" %}
+
+                                <span class="badge bg-secondary">Placeholder</span>
+
+                                {% else %}
+
+                                <span class="badge bg-warning text-dark">{{ col.status }}</span>
+
+                                {% endif %}
+
+                            </td>
+
+                            <td>
+
+                                {% if col.collector == "Domain Collector" %}
+
+                                Provider: <strong>{{ col.mail_provider }}</strong> ({{ col.domain_type }}) | MX: {{ col.mx_count }} | SPF: {{ "Yes" if col.spf else "No" }} | DMARC: {{ "Yes" if col.dmarc else "No" }}
+
+                                {% elif col.collector == "Provider Collector" %}
+
+                                Provider: {{ col.provider }} ({{ col.provider_type|title }})
+
+                                {% elif col.collector == "Username Correlation Collector" %}
+
+                                Correlated Username: <code>{{ col.correlated_username }}</code>
+
+                                {% elif col.collector == "Reputation Collector" %}
+
+                                Spam Blacklisted: {{ col.spam_blacklisted }}
+
+                                {% elif col.collector == "Gravatar Collector" %}
+
+                                Gravatar Exists: {{ col.gravatar_exists }}
+
+                                {% elif col.collector == "Breach Collector" %}
+
+                                Breaches Found: {{ col.breaches_found }}
+
+                                {% else %}
+
+                                {{ col.status|title }}
+
+                                {% endif %}
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% elif result.type == "username" or result.data.profiles %}
+
+    <!-- ========================================= -->
+    <!-- Username Investigation View -->
     <!-- ========================================= -->
 
     <div class="row g-4">
@@ -182,9 +549,7 @@ TraceLens | Investigation Results
 
     </div>
 
-    <!-- ========================================= -->
-    <!-- Username Results -->
-    <!-- ========================================= -->
+    <!-- Username Results Table -->
 
     <div class="card dashboard-card mt-4">
 
@@ -287,41 +652,31 @@ TraceLens | Investigation Results
 
     </div>
 
+    {% else %}
+
     <!-- ========================================= -->
-    <!-- Placeholder -->
+    <!-- Generic Module View (Domain / Phone / IP / Hash) -->
     <!-- ========================================= -->
 
     <div class="card dashboard-card mt-4">
 
         <div class="card-body">
 
-            <h5>
-
-                Upcoming Investigation Modules
-
-            </h5>
+            <h4>
+                {{ result.data.module }} Results
+            </h4>
 
             <hr>
 
-            <ul>
-
-                <li>Email Intelligence</li>
-
-                <li>Domain Intelligence</li>
-
-                <li>Phone Intelligence</li>
-
-                <li>IP Intelligence</li>
-
-                <li>Hash Lookup</li>
-
-                <li>Threat Intelligence</li>
-
-            </ul>
+            <p>
+                <strong>Summary:</strong> {{ result.data.summary }}
+            </p>
 
         </div>
 
     </div>
+
+    {% endif %}
 
     <!-- ========================================= -->
     <!-- Buttons -->

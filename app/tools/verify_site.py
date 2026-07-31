@@ -27,8 +27,8 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-from app.osint.data.username_sites import SITES
-from app.osint.detectors.constants import HEADERS
+from app.osint.modules.username.data.username_sites import SITES
+from app.osint.modules.username.detectors.constants import HEADERS
 
 
 FAKE_USERNAME = "asdfqwerzxcv9876543"

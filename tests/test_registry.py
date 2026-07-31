@@ -4,7 +4,7 @@ TraceLens Detector Registry Tests
 ============================================================
 """
 
-from app.osint.detectors.registry import (
+from app.osint.modules.username.detectors.registry import (
     get_detector,
     is_registered,
     list_detectors,

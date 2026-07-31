@@ -15,7 +15,7 @@ from flask import Flask
 
 from app.routes import main
 
-from app.osint.data.validator import validate_sites
+from app.osint.modules.username.data.validator import validate_sites
 
 
 # ==========================================================

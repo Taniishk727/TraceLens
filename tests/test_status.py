@@ -14,9 +14,9 @@ TraceLens
 
 from unittest.mock import Mock
 
-from app.osint.detectors.status import detect
+from app.osint.modules.username.detectors.status import detect
 
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.constants import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_UNKNOWN,

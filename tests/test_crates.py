@@ -12,9 +12,9 @@ Run:
 
 from unittest.mock import Mock
 
-from app.osint.detectors.api import detect
-from app.osint.data.username_sites import SITES
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.api import detect
+from app.osint.modules.username.data.username_sites import SITES
+from app.osint.modules.username.detectors.constants import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_ERROR,

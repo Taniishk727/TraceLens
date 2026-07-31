@@ -15,11 +15,11 @@ Architecture changes from v3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
-from app.osint.transport.requests_transport import RequestsTransport
-from app.osint.transport.browser_transport import BrowserTransport
-from app.osint.data.username_sites import SITES
-from app.osint.detectors.registry import get_detector
-from app.osint.profiler import EngineProfiler
+from app.osint.core.transport.requests_transport import RequestsTransport
+from app.osint.core.transport.browser_transport import BrowserTransport
+from app.osint.modules.username.data.username_sites import SITES
+from app.osint.modules.username.detectors.registry import get_detector
+from app.osint.modules.username.profiler import EngineProfiler
 
 
 # One shared instance per process — browser workers stay alive across investigations.

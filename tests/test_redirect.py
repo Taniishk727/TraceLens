@@ -11,8 +11,8 @@ Run:
 
 from unittest.mock import Mock
 
-from app.osint.detectors.redirect import detect
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.redirect import detect
+from app.osint.modules.username.detectors.constants import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_UNKNOWN,

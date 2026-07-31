@@ -16,7 +16,7 @@ Detection order
 
 from bs4 import BeautifulSoup
 
-from app.osint.detectors.constants import (
+from app.osint.modules.username.detectors.constants import (
     STATUS_FOUND,
     STATUS_NOT_FOUND,
     STATUS_UNKNOWN,
@@ -26,7 +26,7 @@ from app.osint.detectors.constants import (
     CONFIDENCE_UNKNOWN,
 )
 
-from app.osint.detectors.common import (
+from app.osint.modules.username.detectors.common import (
     start_timer,
     stop_timer,
     build_result,

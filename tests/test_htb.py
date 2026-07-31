@@ -9,7 +9,7 @@ Run:
     pytest tests/test_htb.py -v
 """
 
-from app.osint.data.username_sites import SITES
+from app.osint.modules.username.data.username_sites import SITES
 
 
 def test_htb_removed_from_sites():

@@ -19,8 +19,8 @@ Author:
 TraceLens
 """
 
-from app.osint.data.username_sites import SITES
-from app.osint.detectors.registry import list_detectors
+from app.osint.modules.username.data.username_sites import SITES
+from app.osint.modules.username.detectors.registry import list_detectors
 
 
 # ==========================================================

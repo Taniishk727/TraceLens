@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request
 
 from app.osint.engine import investigate
-from app.osint.data.username_sites import SITES
+from app.osint.modules.username.data.username_sites import SITES
 
 main = Blueprint("main", __name__)
 

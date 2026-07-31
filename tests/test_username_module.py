@@ -11,8 +11,8 @@ Run:
 """
 
 from unittest.mock import Mock, patch
-from app.osint.transport.requests_transport import RequestsTransport
-from app.osint.modules.username import run_detector
+from app.osint.core.transport.requests_transport import RequestsTransport
+from app.osint.modules.username.username import run_detector
 
 
 def test_requests_transport_modern_headers():
@@ -38,8 +38,8 @@ def test_requests_transport_cookie_clearing():
     assert len(transport.session.cookies) == 0
 
 
-@patch("app.osint.modules.username.REQUESTS_TRANSPORT")
-@patch("app.osint.modules.username.BROWSER_TRANSPORT")
+@patch("app.osint.modules.username.username.REQUESTS_TRANSPORT")
+@patch("app.osint.modules.username.username.BROWSER_TRANSPORT")
 def test_cloudflare_403_fallback_triggered(mock_browser, mock_requests):
     mock_requests.fetch.return_value = {
         "success": True,
