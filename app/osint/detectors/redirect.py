@@ -38,19 +38,94 @@ def detect(site, username, transport):
     Detect username using redirect behavior.
 
     The transport layer performs the HTTP request.
-    This detector only analyzes the response.
+    This detector analyzes the response status code and Location header.
     """
 
     url = site["url"].format(username)
 
-    redirect_markers = [
-        marker.lower()
-        for marker in site.get("redirect_not_found", [])
-    ]
+    found_status = site.get("found_status", [200])
+    not_found_status = site.get("not_found_status", [302])
+    not_found_redirect = site.get("not_found_redirect")
+
+    # Handle legacy site configurations using 'redirect_not_found'
+    if not_found_redirect is None and "redirect_not_found" in site:
+        redirect_markers = [
+            marker.lower()
+            for marker in site.get("redirect_not_found", [])
+        ]
+
+        timer = start_timer()
+        response = transport.fetch(url)
+        elapsed = stop_timer(timer)
+
+        if not response["success"]:
+            return build_error(
+                site=site,
+                url=url,
+                response_time=elapsed,
+                detector=DISPLAY_REDIRECT,
+                error=response.get("error", "Unknown transport error"),
+            )
+
+        status_code = response["status"]
+        final_url = response.get("final_url", "").lower()
+
+        if status_code in site.get("not_found_status", [404, 410]):
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_NOT_FOUND,
+                status_code=status_code,
+                confidence=CONFIDENCE_HIGH,
+                response_time=elapsed,
+                detector=DISPLAY_REDIRECT,
+                extra={"final_url": response.get("final_url")}
+            )
+
+        if status_code in site.get("unknown_status", [401, 403, 429, 999]):
+            return build_result(
+                site=site,
+                url=url,
+                status=STATUS_UNKNOWN,
+                status_code=status_code,
+                confidence=CONFIDENCE_LOW,
+                response_time=elapsed,
+                detector=DISPLAY_REDIRECT,
+                error="Authentication or bot protection",
+                extra={"final_url": response.get("final_url")}
+            )
+
+        for marker in redirect_markers:
+            if marker in final_url:
+                return build_result(
+                    site=site,
+                    url=url,
+                    status=STATUS_NOT_FOUND,
+                    status_code=status_code,
+                    confidence=CONFIDENCE_HIGH,
+                    response_time=elapsed,
+                    detector=DISPLAY_REDIRECT,
+                    extra={"final_url": response.get("final_url")}
+                )
+
+        return build_result(
+            site=site,
+            url=url,
+            status=STATUS_FOUND,
+            status_code=status_code,
+            confidence=CONFIDENCE_HIGH,
+            response_time=elapsed,
+            detector=DISPLAY_REDIRECT,
+            extra={"final_url": response.get("final_url")}
+        )
+
+    # --------------------------------------------------
+    # Location Header / Initial Response Redirect Detector
+    # --------------------------------------------------
 
     timer = start_timer()
 
-    response = transport.fetch(url)
+    response = transport.fetch(url, allow_redirects=False)
 
     elapsed = stop_timer(timer)
 
@@ -64,13 +139,30 @@ def detect(site, username, transport):
         )
 
     status_code = response["status"]
-    final_url = response["final_url"].lower()
+    headers = response.get("headers", {}) or {}
 
-    # --------------------------------------------------
-    # HTTP Status takes precedence
-    # --------------------------------------------------
+    location = None
+    if isinstance(headers, dict):
+        for k, v in headers.items():
+            if k.lower() == "location":
+                location = v
+                break
 
-    if status_code in site.get("not_found_status", [404, 410]):
+    # FOUND: status code is in found_status AND no redirect occurred
+    if status_code in found_status and not location:
+        return build_result(
+            site=site,
+            url=url,
+            status=STATUS_FOUND,
+            status_code=status_code,
+            confidence=CONFIDENCE_HIGH,
+            response_time=elapsed,
+            detector=DISPLAY_REDIRECT,
+            extra={"location": location}
+        )
+
+    # NOT_FOUND: status code is in not_found_status AND Location header exactly matches not_found_redirect
+    if status_code in not_found_status and location == not_found_redirect:
         return build_result(
             site=site,
             url=url,
@@ -79,64 +171,17 @@ def detect(site, username, transport):
             confidence=CONFIDENCE_HIGH,
             response_time=elapsed,
             detector=DISPLAY_REDIRECT,
-            extra={
-                "final_url": response["final_url"]
-            }
+            extra={"location": location}
         )
 
-    # --------------------------------------------------
-    # Login wall / Bot protection
-    # --------------------------------------------------
-
-    if status_code in site.get("unknown_status", [401, 403, 429, 999]):
-        return build_result(
-            site=site,
-            url=url,
-            status=STATUS_UNKNOWN,
-            status_code=status_code,
-            confidence=CONFIDENCE_LOW,
-            response_time=elapsed,
-            detector=DISPLAY_REDIRECT,
-            error="Authentication or bot protection",
-            extra={
-                "final_url": response["final_url"]
-            }
-        )
-
-    # --------------------------------------------------
-    # Redirect markers
-    # --------------------------------------------------
-
-    for marker in redirect_markers:
-
-        if marker in final_url:
-
-            return build_result(
-                site=site,
-                url=url,
-                status=STATUS_NOT_FOUND,
-                status_code=status_code,
-                confidence=CONFIDENCE_HIGH,
-                response_time=elapsed,
-                detector=DISPLAY_REDIRECT,
-                extra={
-                    "final_url": response["final_url"]
-                }
-            )
-
-    # --------------------------------------------------
-    # Found
-    # --------------------------------------------------
-
+    # Otherwise: UNKNOWN
     return build_result(
         site=site,
         url=url,
-        status=STATUS_FOUND,
+        status=STATUS_UNKNOWN,
         status_code=status_code,
-        confidence=CONFIDENCE_HIGH,
+        confidence=CONFIDENCE_LOW,
         response_time=elapsed,
         detector=DISPLAY_REDIRECT,
-        extra={
-            "final_url": response["final_url"]
-        }
+        extra={"location": location}
     )

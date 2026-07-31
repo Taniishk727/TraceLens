@@ -91,20 +91,21 @@ def parse_json_response(response):
 
 def detect(site, username, transport):
 
-    url = site.get("api_url", site["url"]).format(username)
+    profile_url = site["url"].format(username)
+    api_url = site.get("api_url", site["url"]).format(username)
 
     expected = site.get("expected", 200)
 
     timer = start_timer()
 
-    response = transport.fetch(url)
+    response = transport.fetch(api_url)
 
     elapsed = stop_timer(timer)
 
     if not response["success"]:
         return build_error(
             site=site,
-            url=url,
+            url=profile_url,
             response_time=elapsed,
             detector=DISPLAY_API,
             error=response.get("error", "Unknown transport error"),
@@ -226,7 +227,7 @@ def detect(site, username, transport):
             decision_reason = f"HTTP status {status_code} != expected {expected}"
 
     print(f"\n[API Detector] Site: {site.get('name')}")
-    print(f"API URL used   : {url}")
+    print(f"API URL used   : {api_url}")
     print(f"HTTP status    : {status_code}")
     print(f"Content-Type   : {content_type}")
     print(f"Raw body length: {raw_len}")
@@ -237,7 +238,7 @@ def detect(site, username, transport):
 
     return build_result(
         site=site,
-        url=url,
+        url=profile_url,
         status=status,
         status_code=status_code,
         confidence=confidence,

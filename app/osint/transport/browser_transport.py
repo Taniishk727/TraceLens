@@ -557,7 +557,7 @@ class BrowserTransport:
     # Public Interface  (unchanged from v1)
     # ------------------------------------------------------------------ #
 
-    def fetch(self, url: str) -> dict:
+    def fetch(self, url: str, *args, **kwargs) -> dict:
         """
         Thread-safe fetch.  Can be called from any thread.
         Dispatches the request to an available browser worker and blocks

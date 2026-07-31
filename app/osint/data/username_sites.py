@@ -404,19 +404,7 @@ SITES = [
         "timeout": 15
     },
 
-# Requires authentication.
-# Unauthenticated requests are redirected to the sign-in page (HTTP 200).
-# Cannot distinguish valid and invalid usernames using status or HTML detection.
-# Requires authenticated browser automation or official API.
-    {
-        "name": "Hack The Box",
-        "category": "Security",
-        "url": "https://app.hackthebox.com/users/{}",
-        "detector": "status",
-        "transport": "requests",
-        "expected": 200,
-        "timeout": 5
-    },
+
 
     # ======================================================
 # Competitive Programming
@@ -479,11 +467,6 @@ SITES = [
     "timeout": 5
 },
 
-# # TODO: GeeksforGeeks has changed its profile routing.
-# Both existing and non-existing usernames resolve to the same generic page
-# with HTTP 200, making reliable detection impossible using status, HTML,
-# or redirect-based methods. Revisit in Phase 2 after investigating the
-# current profile URL structure or any available API.
 {
     "name": "GeeksforGeeks",
     "category": "Competitive Programming",
@@ -583,18 +566,16 @@ SITES = [
 "not_found": []
 },
 
-# TODO: Ko-fi returns HTTP 200 for both existing and non-existing
-# usernames. Investigate HTML markers or redirect behavior in Phase 2.
 {
     "name": "Ko-fi",
     "category": "Portfolio",
     "url": "https://ko-fi.com/{}",
-    "detector": "status",
-    "expected": 200,
-    "timeout": 5,
+    "detector": "redirect",
     "transport": "requests",
-    "found": [],
-"not_found": []
+    "timeout": 5,
+    "found_status": [200],
+    "not_found_status": [302],
+    "not_found_redirect": "/"
 },
 
 # ======================================================
@@ -658,19 +639,14 @@ SITES = [
     "timeout": 5
 },
 
-# TODO: Crates.io investigation (Phase 2)
-# Browser successfully loads valid user profiles, but HTTP requests from
-# TraceLens receive a genuine 404 with an empty response body.
-# URL pattern appears correct.
-# Investigate request headers, User-Agent, Accept headers, and possible
-# anti-bot/client detection. Do not change the detector until resolved.
 {
     "name": "Crates.io",
     "category": "Open Source",
     "url": "https://crates.io/users/{}",
-    "detector": "status",
-    "expected": 200,
+    "detector": "api",
+    "api_url": "https://crates.io/api/v1/users/{}",
     "transport": "requests",
+    "expected": 200,
     "timeout": 5
 },
 

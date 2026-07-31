@@ -41,7 +41,7 @@ class RequestsTransport:
                 "application/signed-exchange;v=b3;q=0.7"
             ),
             "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
             "Cache-Control": "max-age=0",
@@ -58,9 +58,12 @@ class RequestsTransport:
         """Clears session cookies to prevent stale cookies across requests."""
         self.session.cookies.clear()
 
-    def fetch(self, url):
+    def fetch(self, url, allow_redirects=None, **kwargs):
         start = time.time()
         debug = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+
+        if allow_redirects is None:
+            allow_redirects = self.allow_redirects
 
         if self.clear_cookies_per_request:
             self.clear_cookies()
@@ -73,7 +76,7 @@ class RequestsTransport:
             response = self.session.get(
                 url,
                 timeout=self.timeout,
-                allow_redirects=self.allow_redirects,
+                allow_redirects=allow_redirects,
                 verify=self.verify_ssl,
             )
 

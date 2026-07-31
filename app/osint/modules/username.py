@@ -50,9 +50,9 @@ class TransportProfilerWrapper:
         self._target = target_transport
         self.last_fetch_info: dict = {}
 
-    def fetch(self, url: str) -> dict:
+    def fetch(self, url: str, *args, **kwargs) -> dict:
         t0 = time.perf_counter()
-        resp = self._target.fetch(url)
+        resp = self._target.fetch(url, *args, **kwargs)
         t1 = time.perf_counter()
         self.last_fetch_info = {
             "transport_time": t1 - t0,

@@ -241,7 +241,7 @@ def validate_sites():
 
         elif detector == "redirect":
 
-            if "redirect_not_found" not in site:
+            if "redirect_not_found" not in site and "not_found_redirect" not in site:
 
                 errors.append({
 
@@ -249,11 +249,11 @@ def validate_sites():
 
                     "type": "Missing Field",
 
-                    "message": "Redirect detector requires 'redirect_not_found'."
+                    "message": "Redirect detector requires 'redirect_not_found' or 'not_found_redirect'."
 
                 })
 
-            elif not isinstance(site["redirect_not_found"], list):
+            elif "redirect_not_found" in site and not isinstance(site["redirect_not_found"], list):
 
                 errors.append({
 
@@ -262,6 +262,18 @@ def validate_sites():
                     "type": "Invalid Field",
 
                     "message": "'redirect_not_found' must be a list."
+
+                })
+
+            elif "not_found_redirect" in site and not isinstance(site["not_found_redirect"], str):
+
+                errors.append({
+
+                    "site": site_name,
+
+                    "type": "Invalid Field",
+
+                    "message": "'not_found_redirect' must be a string."
 
                 })
 
@@ -352,11 +364,11 @@ if __name__ == "__main__":
 
     if report["valid"]:
 
-        print("✓ Site database validation successful.")
+        print("[OK] Site database validation successful.")
 
     else:
 
-        print("✗ Validation failed.\n")
+        print("[FAIL] Validation failed.\n")
 
         for error in report["errors"]:
 
