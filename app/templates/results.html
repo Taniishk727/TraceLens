@@ -82,181 +82,695 @@ TraceLens | Investigation Results
     <!-- Conditional Results Section -->
     <!-- ========================================= -->
 
-    {% if result.type == "email" or result.data.parsed %}
+    {% if result.type == "email" %}
 
+    {% set verification_col = namespace(data=none) %}
+    {% set provider_col = namespace(data=none) %}
     {% set domain_col = namespace(data=none) %}
+    {% set reputation_col = namespace(data=none) %}
+    {% set gravatar_col = namespace(data=none) %}
+    {% set avatar_col = namespace(data=none) %}
+    {% set identity_col = namespace(data=none) %}
+    {% set presence_col = namespace(data=none) %}
+    {% set git_col = namespace(data=none) %}
+    {% set pgp_col = namespace(data=none) %}
+    {% set search_col = namespace(data=none) %}
+    {% set breach_col = namespace(data=none) %}
+
     {% for col in result.data.results %}
-        {% if col.collector == "Domain Collector" %}
+        {% if col.collector == "Verification Collector" %}
+            {% set verification_col.data = col %}
+        {% elif col.collector == "Provider Collector" %}
+            {% set provider_col.data = col %}
+        {% elif col.collector == "Domain Collector" %}
             {% set domain_col.data = col %}
+        {% elif col.collector == "Reputation Collector" %}
+            {% set reputation_col.data = col %}
+        {% elif col.collector in ["Account Presence Collector", "Account Presence"] %}
+            {% set presence_col.data = col %}
+        {% elif col.collector == "Gravatar Collector" %}
+            {% set gravatar_col.data = col %}
+        {% elif col.collector in ["Public Avatar Collector", "Public Avatar"] %}
+            {% set avatar_col.data = col %}
+        {% elif col.collector in ["Identity Discovery Collector", "Identity Discovery"] %}
+            {% set identity_col.data = col %}
+        {% elif col.collector == "Public Git Collector" %}
+            {% set git_col.data = col %}
+        {% elif col.collector == "PGP Collector" %}
+            {% set pgp_col.data = col %}
+        {% elif col.collector == "Public Search Collector" %}
+            {% set search_col.data = col %}
+        {% elif col.collector == "Breach Collector" %}
+            {% set breach_col.data = col %}
         {% endif %}
     {% endfor %}
 
     <!-- ========================================= -->
-    <!-- Email Investigation View -->
+    <!-- SECTION 2: EMAIL SUMMARY                  -->
     <!-- ========================================= -->
-
-    <div class="row g-4">
-
-        <div class="col-lg-6">
-
-            <div class="card dashboard-card h-100">
-
-                <div class="card-body">
-
-                    <h5>
-                        Email Summary
-                    </h5>
-
-                    <hr>
-
-                    <ul class="list-group list-group-flush">
-
-                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Normalized Email:</span>
-                            <strong>{{ result.data.parsed.email }}</strong>
-                        </li>
-
-                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Local Part:</span>
-                            <strong>{{ result.data.parsed.local_part }}</strong>
-                        </li>
-
-                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Domain:</span>
-                            <strong>{{ result.data.parsed.domain }}</strong>
-                        </li>
-
-                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Provider:</span>
-                            <strong class="text-info">{{ result.data.parsed.provider }}</strong>
-                        </li>
-
-                    </ul>
-
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <h4 class="mb-3 text-info">
+                <i class="bi bi-envelope-at me-2"></i>Email Summary
+            </h4>
+            <hr>
+            <div class="row g-3">
+                <div class="col-md-4 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Normalized Email</small>
+                        <strong class="text-light fs-6 font-monospace">{{ result.data.parsed.email or result.data.summary.normalized_email }}</strong>
+                    </div>
                 </div>
 
+                <div class="col-md-2 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Local Part</small>
+                        <code class="text-info fs-6">{{ result.data.parsed.local_part or result.data.summary.local_part }}</code>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Domain</small>
+                        <strong class="text-light">{{ result.data.parsed.domain or result.data.summary.domain }}</strong>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Provider & Category</small>
+                        <strong class="text-info">{{ result.data.parsed.provider or result.data.summary.provider }}</strong>
+                        <span class="badge bg-secondary ms-1">{{ provider_col.data.provider_type if provider_col.data else result.data.parsed.provider_type }}</span>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Mailbox Status</small>
+                        {% set status_val = verification_col.data.mailbox_status if verification_col.data else result.data.summary.mailbox_status %}
+                        <span class="badge {% if status_val == 'Verified' %}bg-success{% elif status_val == 'Likely Exists' %}bg-info text-dark{% elif status_val == 'Unknown' %}bg-warning text-dark{% else %}bg-danger{% endif %} fs-6">
+                            {{ status_val }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Confidence Score</small>
+                        {% set score_val = verification_col.data.confidence_score if verification_col.data else result.data.summary.confidence_score %}
+                        <span class="badge {% if score_val >= 80 %}bg-success{% elif score_val >= 50 %}bg-info text-dark{% else %}bg-secondary{% endif %} fs-6">
+                            {{ score_val }} / 100
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Role-based Address</small>
+                        {% set is_role = provider_col.data.is_role_based if provider_col.data else (reputation_col.data.is_role_based if reputation_col.data else false) %}
+                        {% if is_role %}
+                        <span class="badge bg-warning text-dark">YES ({{ provider_col.data.role_name or 'Functional Mailbox' }})</span>
+                        {% else %}
+                        <span class="badge bg-success">NO (Personal)</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block">Disposable Domain</small>
+                        {% set is_disp = result.data.parsed.is_disposable or (domain_col.data and domain_col.data.disposable) %}
+                        {% if is_disp %}
+                        <span class="badge bg-danger">YES (Disposable)</span>
+                        {% else %}
+                        <span class="badge bg-success">NO (Permanent)</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- SECTION 3: EMAIL VERIFICATION             -->
+    <!-- ========================================= -->
+    {% if verification_col.data %}
+    <div class="card dashboard-card mb-4 border border-info border-opacity-25">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0 text-info">
+                    <i class="bi bi-shield-check me-2"></i>Email Verification
+                </h4>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-secondary small me-1">Confidence Score:</span>
+                    <span class="badge {% if verification_col.data.confidence_score >= 80 %}bg-success{% elif verification_col.data.confidence_score >= 50 %}bg-info text-dark{% else %}bg-secondary{% endif %} fs-6">
+                        {{ verification_col.data.confidence_score }} / 100
+                    </span>
+                </div>
+            </div>
+            <div class="progress mb-4" style="height: 6px; background-color: rgba(255, 255, 255, 0.1);">
+                <div class="progress-bar {% if verification_col.data.confidence_score >= 80 %}bg-success{% elif verification_col.data.confidence_score >= 50 %}bg-info{% else %}bg-secondary{% endif %}"
+                     role="progressbar" style="width: {{ verification_col.data.confidence_score }}%;"
+                     aria-valuenow="{{ verification_col.data.confidence_score }}" aria-valuemin="0" aria-valuemax="100">
+                </div>
             </div>
 
+            <div class="row g-3">
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Syntax</small>
+                        {% if verification_col.data.syntax_valid %}
+                        <span class="badge bg-success">Valid</span>
+                        {% else %}
+                        <span class="badge bg-danger">Invalid</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Domain Exists</small>
+                        {% if verification_col.data.domain_exists %}
+                        <span class="badge bg-success">Exists</span>
+                        {% else %}
+                        <span class="badge bg-danger">Not Found</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ MX Records</small>
+                        {% if verification_col.data.mx_present %}
+                        <span class="badge bg-success">Present</span>
+                        {% else %}
+                        <span class="badge bg-danger">Missing</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Mailbox Status</small>
+                        <span class="badge {% if verification_col.data.mailbox_status == 'Verified' %}bg-success{% elif verification_col.data.mailbox_status == 'Likely Exists' %}bg-info text-dark{% elif verification_col.data.mailbox_status == 'Unknown' %}bg-warning text-dark{% else %}bg-danger{% endif %} fs-6">
+                            {{ verification_col.data.mailbox_status }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Provider</small>
+                        <strong class="text-light">{{ verification_col.data.provider }}</strong>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Provider Type</small>
+                        <span class="badge {% if verification_col.data.provider_type == 'Public' %}bg-primary{% else %}bg-secondary{% endif %}">
+                            {{ verification_col.data.provider_type }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Disposable</small>
+                        {% if verification_col.data.disposable %}
+                        <span class="badge bg-danger">YES</span>
+                        {% else %}
+                        <span class="badge bg-success">NO</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ SMTP Supported</small>
+                        {% if verification_col.data.smtp_supported %}
+                        <span class="badge bg-success">Supported</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Unsupported / Blocked</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Catch-All</small>
+                        {% if verification_col.data.catch_all %}
+                        <span class="badge bg-warning text-dark">YES (Catch-All)</span>
+                        {% else %}
+                        <span class="badge bg-secondary">NO / False</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="col-md-9 col-sm-12">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">✓ Explanation</small>
+                        <span class="text-info font-monospace small">{{ verification_col.data.reason }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
+    {% endif %}
 
-        <div class="col-lg-6">
+    <!-- ========================================= -->
+    <!-- SECTION 4: IDENTITY SUMMARY               -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4 border border-info border-opacity-25">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0 text-info">
+                    <i class="bi bi-person-badge me-2"></i>Identity Summary
+                </h4>
+                {% if result.data.identity_summary %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-secondary small me-1">Confidence:</span>
+                    <span class="badge {% if result.data.identity_summary.confidence == 'HIGH' %}bg-success{% elif result.data.identity_summary.confidence == 'MEDIUM' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %} fs-6 px-3 py-2">
+                        {{ result.data.identity_summary.confidence }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            <hr>
 
-            <div class="card dashboard-card h-100">
+            {% if result.data.identity_summary %}
+            <div class="row g-4 mb-4">
+                <!-- Summary Badges Grid -->
+                <div class="col-md-4">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">Profiles Found</small>
+                        <strong class="text-success fs-3">{{ result.data.identity_summary.profiles_found }}</strong>
+                        <span class="text-secondary small d-block mt-1">Discovered on public identity platforms</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">Evidence Count</small>
+                        <strong class="text-info fs-3">{{ result.data.identity_summary.evidence_count }}</strong>
+                        <span class="text-secondary small d-block mt-1">Verified evidence items collected</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <small class="text-secondary d-block mb-1">Confidence Rationale</small>
+                        <div class="mt-1">
+                            {% for reason in result.data.identity_summary.reasons %}
+                            <div class="small text-light font-monospace">✓ {{ reason }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
 
-                <div class="card-body">
+                <!-- Primary Identity Card -->
+                {% if result.data.identity_summary.primary_identity %}
+                {% set prim = result.data.identity_summary.primary_identity %}
+                <div class="col-12">
+                    <div class="p-4 rounded bg-dark border border-info border-opacity-50 shadow-sm">
+                        <h6 class="text-info text-uppercase small font-monospace mb-3">
+                            <i class="bi bi-star-fill text-warning me-1"></i>Primary Identity
+                        </h6>
+                        <div class="row align-items-center g-3">
+                            <div class="col-auto">
+                                {% if prim.avatar_url %}
+                                <img src="{{ prim.avatar_url }}" alt="Primary Avatar" class="rounded-circle border border-info shadow" style="width: 84px; height: 84px; object-fit: cover;">
+                                {% else %}
+                                <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center border border-info shadow" style="width: 84px; height: 84px;">
+                                    <i class="bi bi-person text-light fs-1"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col">
+                                <h4 class="text-light mb-1">
+                                    {{ prim.display_name or 'Public User Profile' }}
+                                    {% if prim.username %}
+                                    <small class="text-info font-monospace fs-6">(@{{ prim.username }})</small>
+                                    {% endif %}
+                                </h4>
+                                <p class="text-secondary small mb-2">
+                                    Primary Provider: <strong class="text-info">{{ prim.provider }}</strong>
+                                </p>
+                                {% if prim.bio %}
+                                <p class="text-light small font-monospace mb-2"><i class="bi bi-quote me-1"></i>{{ prim.bio }}</p>
+                                {% endif %}
+                                <div class="d-flex flex-wrap gap-3 mt-2 small font-monospace">
+                                    {% if prim.location %}
+                                    <span class="text-secondary"><i class="bi bi-geo-alt me-1 text-info"></i>{{ prim.location }}</span>
+                                    {% endif %}
+                                    {% if prim.website %}
+                                    <a href="{{ prim.website }}" target="_blank" class="text-info text-decoration-none">
+                                        <i class="bi bi-link-45deg me-1"></i>{{ prim.website }}
+                                    </a>
+                                    {% endif %}
+                                    {% if prim.profile_url %}
+                                    <a href="{{ prim.profile_url }}" target="_blank" class="text-info text-decoration-none fw-semibold">
+                                        Visit Profile Link <i class="bi bi-box-arrow-up-right small ms-1"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
 
-                    <h5>
-                        Domain Intelligence
-                    </h5>
+            <!-- Identity Discovery Timeline -->
+            {% if result.data.timeline %}
+            <h6 class="text-secondary small font-monospace text-uppercase mb-3">Identity Discovery Timeline</h6>
+            <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                <div class="d-flex flex-wrap align-items-center justify-content-between g-3">
+                    {% for step in result.data.timeline %}
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="rounded-circle bg-info bg-opacity-10 border border-info text-info d-flex align-items-center justify-content-center fw-bold me-2" style="width: 36px; height: 36px;">
+                            {{ step.step }}
+                        </div>
+                        <div>
+                            <strong class="text-light d-block small">{{ step.label }}</strong>
+                            <small class="text-secondary font-monospace" style="font-size: 0.75rem;">{{ step.description }}</small>
+                        </div>
+                    </div>
+                    {% if not loop.last %}
+                    <div class="text-secondary fs-5 mx-2 d-none d-md-block"><i class="bi bi-arrow-right text-info"></i></div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
-                    <hr>
+            {% else %}
+            <p class="text-secondary mb-0">No identity summary generated.</p>
+            {% endif %}
+        </div>
+    </div>
 
+    <!-- ========================================= -->
+    <!-- SECTION 5: UNIFIED PUBLIC AVATAR           -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <h4 class="mb-3 text-info">
+                <i class="bi bi-image-fill me-2"></i>Public Avatar
+            </h4>
+            <hr>
+            {% if result.data.public_avatar %}
+                <div class="row g-4">
+                    {% for card in result.data.public_avatar %}
+                    <div class="col-md-6">
+                        <div class="p-4 rounded bg-dark border border-info border-opacity-50 h-100 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex align-items-start gap-3 mb-3">
+                                    <img src="{{ card.avatar_url }}" alt="Public Avatar Preview" class="rounded-circle border border-info shadow" style="width: 80px; height: 80px; object-fit: cover;">
+                                    <div>
+                                        <h5 class="text-light mb-1">{{ card.display_name or 'Public Profile Avatar' }}</h5>
+                                        {% if card.primary_username %}
+                                        <div class="text-info font-monospace small mb-1">@{{ card.primary_username }}</div>
+                                        {% endif %}
+                                        {% if card.location %}
+                                        <div class="text-secondary small"><i class="bi bi-geo-alt me-1"></i>{{ card.location }}</div>
+                                        {% endif %}
+                                        {% if card.website %}
+                                        <div class="text-truncate" style="max-width: 220px;">
+                                            <a href="{{ card.website }}" target="_blank" class="text-info small font-monospace text-decoration-none">
+                                                <i class="bi bi-link-45deg me-1"></i>{{ card.website }}
+                                            </a>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <small class="text-secondary font-monospace d-block mb-1">Found On:</small>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% for prov in card.providers %}
+                                        <span class="badge bg-success bg-opacity-25 border border-success text-success px-2 py-1 font-monospace">
+                                            ✓ {{ prov }}
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if card.profile_urls %}
+                            <div class="pt-3 border-top border-secondary border-opacity-25 d-flex flex-wrap gap-2">
+                                {% for prov_name, prof_link in card.profile_urls.items() %}
+                                <a href="{{ prof_link }}" target="_blank" class="btn btn-sm btn-outline-info font-monospace flex-grow-1">
+                                    Visit {{ prov_name }} <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                                </a>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+            <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 text-center">
+                <p class="text-secondary mb-0">No public avatars discovered for this target address.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- SECTION 6: EVIDENCE                       -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <h4 class="mb-3 text-info">
+                <i class="bi bi-patch-check-fill me-2"></i>Evidence
+            </h4>
+            <hr>
+            {% if result.data.evidence %}
+            <div class="row g-3">
+                {% for item in result.data.evidence %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-info text-dark font-monospace">
+                                    ✓ {{ item.type }}
+                                </span>
+                                <span class="badge bg-dark border border-secondary text-light font-monospace small">
+                                    {{ item.provider }}
+                                </span>
+                            </div>
+                            <div class="text-light font-monospace small text-truncate mt-2" title="{{ item.value }}">
+                                {{ item.value }}
+                            </div>
+                        </div>
+                        <div class="mt-2 text-end">
+                            <small class="text-secondary font-monospace" style="font-size: 0.7rem;">Confidence: {{ item.confidence }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 text-center">
+                <p class="text-secondary mb-0">No verified evidence items extracted.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- SECTION 7: PUBLIC PROFILES                -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0 text-info">
+                    <i class="bi bi-globe me-2"></i>Public Profiles
+                </h4>
+                {% if presence_col.data %}
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-success px-3 py-2 text-light">
+                        Registered Accounts: {{ presence_col.data.registered_accounts }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            <hr>
+
+            {% set active_presence_results = [] %}
+            {% if presence_col.data and presence_col.data.results %}
+                {% for item in presence_col.data.results %}
+                    {% if item.status != 'UNSUPPORTED' %}
+                        {% set _ = active_presence_results.append(item) %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            {% if active_presence_results %}
+                <div class="row g-3">
+                    {% for item in active_presence_results %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="p-3 rounded bg-dark border {% if item.status == 'REGISTERED' %}border-success border-opacity-50{% elif item.status == 'UNKNOWN' %}border-warning border-opacity-25{% elif item.status == 'ERROR' %}border-danger border-opacity-50{% else %}border-secondary border-opacity-25{% endif %} h-100 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 text-light fw-bold">
+                                        {% if item.provider == 'GitHub' %}<i class="bi bi-github me-1 text-light"></i>
+                                        {% elif item.provider == 'GitLab' %}<i class="bi bi-gitlab me-1 text-warning"></i>
+                                        {% elif item.provider == 'Reddit' %}<i class="bi bi-reddit me-1 text-danger"></i>
+                                        {% elif item.provider == 'Docker Hub' %}<i class="bi bi-box-seam me-1 text-info"></i>
+                                        {% elif item.provider == 'Gravatar' or item.provider == 'Libravatar' %}<i class="bi bi-person-circle me-1 text-info"></i>
+                                        {% else %}<i class="bi bi-globe me-1 text-secondary"></i>{% endif %}
+                                        {{ item.provider }}
+                                    </h6>
+                                    <span class="badge {% if item.status == 'REGISTERED' %}bg-success{% elif item.status == 'NOT_REGISTERED' %}bg-secondary{% elif item.status == 'UNKNOWN' %}bg-warning text-dark{% elif item.status == 'ERROR' %}bg-danger{% else %}bg-secondary{% endif %} font-monospace">
+                                        {{ item.status }}
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <small class="text-secondary font-monospace me-1">Confidence:</small>
+                                        <span class="badge bg-dark border border-secondary text-light font-monospace small">{{ item.confidence }}</span>
+                                    </div>
+                                    {% if item.metadata and item.metadata.execution_time_ms %}
+                                    <span class="text-secondary small font-monospace">{{ item.metadata.execution_time_ms }} ms</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if item.status == 'REGISTERED' %}
+                                    <div class="d-flex align-items-start gap-3 mt-3 mb-2">
+                                        {% if item.avatar_url %}
+                                        <img src="{{ item.avatar_url }}" alt="{{ item.provider }} Avatar" class="rounded-circle border border-info shadow-sm" style="width: 52px; height: 52px; object-fit: cover;">
+                                        {% endif %}
+                                        <div class="overflow-hidden w-100">
+                                            {% if item.display_name %}
+                                            <div class="text-light fw-semibold text-truncate small">{{ item.display_name }}</div>
+                                            {% endif %}
+                                            {% if item.username %}
+                                            <div class="text-info font-monospace small text-truncate">@{{ item.username }}</div>
+                                            {% endif %}
+                                            {% if item.bio %}
+                                            <div class="text-secondary small font-monospace text-truncate mt-1">{{ item.bio }}</div>
+                                            {% endif %}
+                                            <div class="d-flex flex-wrap gap-2 mt-2 small font-monospace">
+                                                {% if item.location %}
+                                                <span class="text-secondary"><i class="bi bi-geo-alt me-1"></i>{{ item.location }}</span>
+                                                {% endif %}
+                                                {% if item.website %}
+                                                <a href="{{ item.website }}" target="_blank" class="text-info text-decoration-none text-truncate" style="max-width: 140px;">
+                                                    <i class="bi bi-link-45deg"></i> Website
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% elif item.status == 'NOT_REGISTERED' %}
+                                    <p class="text-secondary small font-monospace mb-0 mt-2">
+                                        No public profile found.
+                                    </p>
+                                {% else %}
+                                    {% if item.notes %}
+                                    <p class="text-secondary small font-monospace mb-0 mt-2">
+                                        {{ item.notes }}
+                                    </p>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+
+                            {% if item.profile_url and item.status == 'REGISTERED' %}
+                            <div class="mt-3 pt-2 border-top border-secondary border-opacity-25">
+                                <a href="{{ item.profile_url }}" target="_blank" class="btn btn-sm btn-outline-info w-100 font-monospace fw-semibold">
+                                    Visit Profile <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+            <div class="p-3 bg-dark rounded border border-secondary border-opacity-25 text-center">
+                <p class="text-secondary mb-0">No public profiles discovered across configured active providers.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- SECTION 8: DOMAIN INTELLIGENCE            -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <h4 class="mb-3 text-info">
+                <i class="bi bi-hdd-network me-2"></i>Domain Intelligence
+            </h4>
+            <hr>
+            <div class="row g-4">
+                <div class="col-md-6">
                     <ul class="list-group list-group-flush">
-
                         <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Domain Type:</span>
+                            <span>Domain Category:</span>
                             <span class="badge {% if domain_col.data and domain_col.data.domain_type == 'Public' %}bg-primary{% elif domain_col.data and domain_col.data.domain_type == 'Educational' %}bg-info text-dark{% elif domain_col.data and domain_col.data.domain_type == 'Government' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
                                 {{ domain_col.data.domain_type if domain_col.data else result.data.parsed.provider_type|upper }}
                             </span>
                         </li>
-
                         <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Mail Provider:</span>
+                            <span>Mail Server Provider:</span>
                             <strong class="text-success">{{ domain_col.data.mail_provider if domain_col.data else "Unknown" }}</strong>
                         </li>
-
                         <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>MX Present:</span>
+                            <span>MX Record Count:</span>
                             <span class="badge {% if domain_col.data and domain_col.data.has_mx %}bg-success{% else %}bg-danger{% endif %}">
-                                {{ "YES (" ~ domain_col.data.mx_count ~ " servers)" if domain_col.data and domain_col.data.has_mx else "NO" }}
+                                {{ domain_col.data.mx_count ~ " server(s)" if domain_col.data and domain_col.data.has_mx else "0 servers" }}
                             </span>
                         </li>
-
-                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between align-items-center">
-                            <span>Disposable Domain:</span>
-                            <span class="badge {% if result.data.parsed.is_disposable or (domain_col.data and domain_col.data.disposable) %}bg-danger{% else %}bg-success{% endif %}">
-                                {{ "YES" if result.data.parsed.is_disposable or (domain_col.data and domain_col.data.disposable) else "NO" }}
-                            </span>
-                        </li>
-
                     </ul>
-
                 </div>
 
+                <div class="col-md-6">
+                    {% if domain_col.data %}
+                    <div class="row g-2">
+                        <div class="col-4 text-center">
+                            <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
+                                <small class="text-secondary d-block">SPF</small>
+                                {% if domain_col.data.spf %}<span class="badge bg-success">Configured</span>{% else %}<span class="badge bg-warning text-dark">Missing</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-4 text-center">
+                            <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
+                                <small class="text-secondary d-block">DMARC</small>
+                                {% if domain_col.data.dmarc %}<span class="badge bg-success">Configured</span>{% else %}<span class="badge bg-warning text-dark">Missing</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-4 text-center">
+                            <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
+                                <small class="text-secondary d-block">DKIM</small>
+                                {% if "Detected" in domain_col.data.dkim %}<span class="badge bg-success">Detected</span>{% else %}<span class="badge bg-secondary">Unknown</span>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-
         </div>
-
     </div>
 
-    <!-- Email Security Posture Summary Cards -->
-    {% if domain_col.data %}
-    <div class="row g-3 mt-1">
-
-        <div class="col-md-4">
-            <div class="card dashboard-card text-center p-3">
-                <small class="text-secondary">SPF Record</small>
-                <div class="mt-2">
-                    {% if domain_col.data.spf %}
-                    <span class="badge bg-success fs-6">Configured</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark fs-6">Missing</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card dashboard-card text-center p-3">
-                <small class="text-secondary">DMARC Policy</small>
-                <div class="mt-2">
-                    {% if domain_col.data.dmarc %}
-                    <span class="badge bg-success fs-6">Configured</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark fs-6">Missing</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card dashboard-card text-center p-3">
-                <small class="text-secondary">DKIM Availability</small>
-                <div class="mt-2">
-                    {% if "Detected" in domain_col.data.dkim %}
-                    <span class="badge bg-success fs-6">{{ domain_col.data.dkim }}</span>
-                    {% else %}
-                    <span class="badge bg-secondary fs-6">Unknown</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-    </div>
-    {% endif %}
-
-    <!-- Detailed DNS Records Expandable Section -->
+    <!-- ========================================= -->
+    <!-- SECTION 9: DNS RECORDS (EXPANDABLE)       -->
+    <!-- ========================================= -->
     {% if domain_col.data and domain_col.data.dns %}
-    <div class="card dashboard-card mt-4">
-
+    <div class="card dashboard-card mb-4">
         <div class="card-body">
-
             <div class="d-flex justify-content-between align-items-center mb-3">
-
-                <h4 class="mb-0">
-                    DNS & Mail Server Records Summary
+                <h4 class="mb-0 text-info">
+                    <i class="bi bi-dns me-2"></i>DNS & Mail Server Records
                 </h4>
-
-                <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#dnsDetailsCollapse" aria-expanded="true" aria-controls="dnsDetailsCollapse">
-                    Toggle DNS Records
+                <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#dnsDetailsCollapse" aria-expanded="false" aria-controls="dnsDetailsCollapse">
+                    Toggle Technical DNS Records
                 </button>
-
             </div>
 
-            <div class="collapse show" id="dnsDetailsCollapse">
-
+            <div class="collapse" id="dnsDetailsCollapse">
                 <div class="row g-4 mt-1">
-
                     <!-- MX Records -->
                     <div class="col-md-6">
                         <h6>MX Records (Mail Exchangers)</h6>
@@ -325,117 +839,130 @@ TraceLens | Investigation Results
                         <p class="text-secondary mb-0">No A records returned.</p>
                         {% endif %}
                     </div>
-
                 </div>
-
             </div>
-
         </div>
-
     </div>
     {% endif %}
 
-    <!-- Email Collectors Pipeline Table -->
-
-    <div class="card dashboard-card mt-4">
-
+    <!-- ========================================= -->
+    <!-- SECTION 10: COLLECTOR PIPELINE            -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4">
         <div class="card-body">
-
-            <h4>
-                Email Collectors Pipeline
+            <h4 class="mb-3 text-info">
+                <i class="bi bi-cpu me-2"></i>Email Collectors Pipeline
             </h4>
-
             <hr>
-
             <div class="table-responsive">
-
                 <table class="table table-dark table-hover align-middle">
-
                     <thead>
-
                         <tr>
-
                             <th>Collector</th>
-
                             <th>Status</th>
-
-                            <th>Findings / Metadata</th>
-
+                            <th>Execution Time</th>
+                            <th>Findings / Metadata Summary</th>
                         </tr>
-
                     </thead>
-
                     <tbody>
-
                         {% for col in result.data.results %}
-
                         <tr>
-
                             <td>
-
                                 <strong>{{ col.collector }}</strong>
-
                             </td>
-
                             <td>
-
                                 {% if col.status == "completed" or col.status == "success" %}
-
                                 <span class="badge bg-success">Completed</span>
-
-                                {% elif col.status == "placeholder" %}
-
-                                <span class="badge bg-secondary">Placeholder</span>
-
+                                {% elif col.status == "not_found" %}
+                                <span class="badge bg-info text-dark">Not Found</span>
+                                {% elif col.status == "unavailable" %}
+                                <span class="badge bg-secondary">Unavailable</span>
+                                {% elif col.status == "skipped" %}
+                                <span class="badge bg-warning text-dark">Skipped</span>
                                 {% else %}
-
-                                <span class="badge bg-warning text-dark">{{ col.status }}</span>
-
+                                <span class="badge bg-danger">{{ col.status|title }}</span>
                                 {% endif %}
-
                             </td>
-
                             <td>
-
-                                {% if col.collector == "Domain Collector" %}
-
-                                Provider: <strong>{{ col.mail_provider }}</strong> ({{ col.domain_type }}) | MX: {{ col.mx_count }} | SPF: {{ "Yes" if col.spf else "No" }} | DMARC: {{ "Yes" if col.dmarc else "No" }}
-
-                                {% elif col.collector == "Provider Collector" %}
-
-                                Provider: {{ col.provider }} ({{ col.provider_type|title }})
-
-                                {% elif col.collector == "Username Correlation Collector" %}
-
-                                Correlated Username: <code>{{ col.correlated_username }}</code>
-
-                                {% elif col.collector == "Reputation Collector" %}
-
-                                Spam Blacklisted: {{ col.spam_blacklisted }}
-
-                                {% elif col.collector == "Gravatar Collector" %}
-
-                                Gravatar Exists: {{ col.gravatar_exists }}
-
-                                {% elif col.collector == "Breach Collector" %}
-
-                                Breaches Found: {{ col.breaches_found }}
-
-                                {% else %}
-
-                                {{ col.status|title }}
-
-                                {% endif %}
-
+                                <span class="font-monospace text-secondary small">{{ col.execution_time_ms ~ " ms" if col.execution_time_ms is defined else "N/A" }}</span>
                             </td>
-
+                            <td>
+                                {% if col.collector == "Verification Collector" %}
+                                Status: <span class="badge {% if col.mailbox_status == 'Verified' %}bg-success{% elif col.mailbox_status == 'Likely Exists' %}bg-info text-dark{% elif col.mailbox_status == 'Unknown' %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ col.mailbox_status }}</span> | Confidence: <strong>{{ col.confidence_score }}/100</strong> | Provider: {{ col.provider }} | SMTP: {{ "Supported" if col.smtp_supported else "No/Blocked" }}
+                                {% elif col.collector == "Provider Collector" %}
+                                Provider: {{ col.provider }} ({{ col.provider_type }}) | Role Address: {{ "YES (" ~ col.role_name ~ ")" if col.is_role_based else "NO" }}
+                                {% elif col.collector == "Domain Collector" %}
+                                Provider: <strong>{{ col.mail_provider }}</strong> ({{ col.domain_type }}) | MX: {{ col.mx_count }} | SPF: {{ "Yes" if col.spf else "No" }} | DMARC: {{ "Yes" if col.dmarc else "No" }}
+                                {% elif col.collector == "Reputation Collector" %}
+                                Reputation Score: <strong>{{ col.reputation_score }}/100</strong> | Category: {{ col.domain_category }}
+                                {% elif col.collector == "Gravatar Collector" %}
+                                Gravatar Exists: <strong>{{ "YES" if col.gravatar_exists else "NO" }}</strong> {{ "| Name: " ~ col.display_name if col.display_name else "" }}
+                                {% elif col.collector in ["Public Avatar Collector", "Public Avatar"] %}
+                                Avatars Found: <strong>{{ col.avatars_found }}</strong> (Checked: {{ col.providers_checked }}) {{ "| Primary: " ~ col.best_avatar.provider if col.best_avatar else "" }}
+                                {% elif col.collector == "Public Git Collector" %}
+                                Commits Found: <strong>{{ col.commit_count }}</strong> | Author: {{ col.author_name or "N/A" }}
+                                {% elif col.collector == "PGP Collector" %}
+                                PGP Keys Found: <strong>{{ col.keys_found }}</strong>
+                                {% elif col.collector == "Public Search Collector" %}
+                                Web Mentions: <strong>{{ col.mentions_found }}</strong>
+                                {% elif col.collector == "Breach Collector" %}
+                                Status: {{ col.status|title }} | Breaches Found: <strong>{{ col.breaches_found }}</strong>
+                                {% else %}
+                                {{ col.reason or col.status|title }}
+                                {% endif %}
+                            </td>
                         </tr>
-
                         {% endfor %}
-
                     </tbody>
-
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- SECTION 11: FUTURE PROVIDERS (COLLAPSED)  -->
+    <!-- ========================================= -->
+    <div class="card dashboard-card mb-4 border border-secondary border-opacity-25">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0 text-secondary">
+                    <i class="bi bi-hourglass-split me-2"></i>Future Providers
+                </h4>
+                <button class="btn btn-sm btn-outline-secondary font-monospace" type="button" data-bs-toggle="collapse" data-bs-target="#futureProvidersCollapse" aria-expanded="false" aria-controls="futureProvidersCollapse">
+                    Show Planned Providers ({{ result.data.future_providers|length if result.data.future_providers else 7 }})
+                </button>
+            </div>
+
+            <div class="collapse mt-3" id="futureProvidersCollapse">
+                <hr class="border-secondary border-opacity-25">
+                <p class="text-secondary small font-monospace mb-3">
+                    Support for these platforms is planned in upcoming TraceLens module iterations. Unauthenticated public API email checks are currently not enabled or restricted by vendor access controls.
+                </p>
+                <div class="row g-3">
+                    {% set future_list = result.data.future_providers if result.data.future_providers else [
+                        {"provider":"Adobe","category":"Creative Cloud","status":"Support Planned"},
+                        {"provider":"Spotify","category":"Media","status":"Support Planned"},
+                        {"provider":"Discord","category":"Chat","status":"Support Planned"},
+                        {"provider":"Steam","category":"Gaming","status":"Support Planned"},
+                        {"provider":"Dropbox","category":"Cloud Storage","status":"Support Planned"},
+                        {"provider":"LinkedIn","category":"Professional Network","status":"Support Planned"},
+                        {"provider":"Canva","category":"Design","status":"Support Planned"}
+                    ] %}
+                    {% for item in future_list %}
+                    <div class="col-md-4 col-sm-6">
+                        <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="text-light font-monospace">{{ item.provider }}</strong>
+                                <span class="badge bg-secondary font-monospace small">{{ item.status }}</span>
+                            </div>
+                            <small class="text-secondary d-block font-monospace" style="font-size: 0.75rem;">{{ item.description or item.category }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
 
             </div>
 
@@ -652,10 +1179,235 @@ TraceLens | Investigation Results
 
     </div>
 
+    {% elif result.type == "phone" or result.data.module == "Phone Investigation" %}
+
+    <!-- ========================================= -->
+    <!-- PHONE INVESTIGATION RESULTS               -->
+    <!-- ========================================= -->
+
+    <!-- Investigation Summary Banner -->
+    <div class="card dashboard-card mb-4 border border-info border-opacity-50">
+        <div class="card-body">
+            <h4 class="mb-3 text-info">
+                <i class="bi bi-info-circle me-2"></i>Investigation Summary
+            </h4>
+            <div class="p-3 rounded bg-dark border border-info border-opacity-25 font-monospace text-light">
+                <i class="bi bi-quote me-2 text-info fs-5"></i>
+                {{ result.data.summary }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview & Validation Grid -->
+    <div class="row g-4 mb-4">
+        <!-- Overview Card -->
+        <div class="col-md-6">
+            <div class="card dashboard-card h-100">
+                <div class="card-body">
+                    <h5 class="text-info mb-3">
+                        <i class="bi bi-telephone-out me-2"></i>Overview
+                    </h5>
+                    <hr>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">E.164 Target:</span>
+                            <strong class="font-monospace text-info">{{ result.data.details.e164_format or result.target }}</strong>
+                        </li>
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Country:</span>
+                            <strong class="text-light">{{ result.data.details.country }}</strong>
+                        </li>
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Region:</span>
+                            <strong class="text-light">{{ result.data.details.region }}</strong>
+                        </li>
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Country Code:</span>
+                            <span class="badge bg-info text-dark font-monospace">{{ result.data.details.country_code }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Card -->
+        <div class="col-md-6">
+            <div class="card dashboard-card h-100">
+                <div class="card-body">
+                    <h5 class="text-info mb-3">
+                        <i class="bi bi-check-circle-fill me-2"></i>Validation
+                    </h5>
+                    <hr>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 text-center">
+                                <small class="text-secondary d-block mb-1">Structure Valid</small>
+                                {% if result.data.details.is_valid %}
+                                <span class="badge bg-success fs-6">✓ VALID</span>
+                                {% else %}
+                                <span class="badge bg-danger fs-6">INVALID</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 text-center">
+                                <small class="text-secondary d-block mb-1">Possibility Check</small>
+                                {% if result.data.details.is_possible %}
+                                <span class="badge bg-success fs-6">✓ POSSIBLE</span>
+                                {% else %}
+                                <span class="badge bg-danger fs-6">IMPOSSIBLE</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                                <small class="text-secondary">Number Type:</small>
+                                <span class="badge bg-primary fs-6 font-monospace">{{ result.data.details.number_type }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone Intelligence & Formatting Grid -->
+    <div class="row g-4 mb-4">
+        <!-- Phone Intelligence Card -->
+        <div class="col-md-6">
+            <div class="card dashboard-card h-100">
+                <div class="card-body">
+                    <h5 class="text-info mb-3">
+                        <i class="bi bi-compass me-2"></i>Phone Intelligence
+                    </h5>
+                    <hr>
+                    <ul class="list-group list-group-flush bg-transparent">
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Country Name:</span>
+                            <strong class="text-light">{{ result.data.details.country }} ({{ result.data.parsed.region_code }})</strong>
+                        </li>
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Geographic Location:</span>
+                            <strong class="text-info">{{ result.data.details.region }}</strong>
+                        </li>
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Timezone:</span>
+                            <strong class="text-warning font-monospace">{{ result.data.details.timezone }}</strong>
+                        </li>
+                        <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                            <span class="text-secondary">Subscriber Number:</span>
+                            <span class="font-monospace text-light">{{ result.data.details.national_number }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formatting Card -->
+        <div class="col-md-6">
+            <div class="card dashboard-card h-100">
+                <div class="card-body">
+                    <h5 class="text-info mb-3">
+                        <i class="bi bi-code-square me-2"></i>Formatting
+                    </h5>
+                    <hr>
+                    <div class="d-flex flex-column gap-3">
+                        <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                            <small class="text-secondary d-block mb-1">Original Input</small>
+                            <code class="fs-6 text-light font-monospace">{{ result.data.parsed.original_input or result.target }}</code>
+                        </div>
+                        <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                            <small class="text-secondary d-block mb-1">E.164 Format (Standardized)</small>
+                            <code class="fs-6 text-info fw-bold">{{ result.data.details.e164_format }}</code>
+                        </div>
+                        <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                            <small class="text-secondary d-block mb-1">International Format</small>
+                            <code class="fs-6 text-light">{{ result.data.details.international_format }}</code>
+                        </div>
+                        <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                            <small class="text-secondary d-block mb-1">National Format</small>
+                            <code class="fs-6 text-light">{{ result.data.details.national_format }}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Future Collector Placeholders Section -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-info mb-0">
+                    <i class="bi bi-puzzle me-2"></i>Modular Collector Pipeline Status
+                </h5>
+                <span class="badge bg-secondary">Phase 1 Architecture</span>
+            </div>
+            <hr>
+
+            <div class="row g-3">
+                <!-- Carrier Intelligence Placeholder -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="text-light small"><i class="bi bi-reception-4 me-1 text-info"></i> Carrier Intelligence</strong>
+                            <span class="badge bg-secondary font-monospace" style="font-size:0.7rem;">READY</span>
+                        </div>
+                        <small class="text-secondary d-block">Network Operator & HLR Lookup interface ready.</small>
+                    </div>
+                </div>
+
+                <!-- Risk Analysis Placeholder -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="text-light small"><i class="bi bi-shield-exclamation me-1 text-warning"></i> Risk Analysis</strong>
+                            <span class="badge bg-secondary font-monospace" style="font-size:0.7rem;">READY</span>
+                        </div>
+                        <small class="text-secondary d-block">Spam scoring & fraud rating engine interface ready.</small>
+                    </div>
+                </div>
+
+                <!-- Public Search Placeholder -->
+                <div class="col-md-4 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="text-light small"><i class="bi bi-search me-1 text-info"></i> Public Search</strong>
+                            <span class="badge bg-secondary font-monospace" style="font-size:0.7rem;">READY</span>
+                        </div>
+                        <small class="text-secondary d-block">Public directory & web index lookup interface ready.</small>
+                    </div>
+                </div>
+
+                <!-- Reputation Placeholder -->
+                <div class="col-md-6 col-sm-6">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="text-light small"><i class="bi bi-star me-1 text-info"></i> Reputation Check</strong>
+                            <span class="badge bg-secondary font-monospace" style="font-size:0.7rem;">READY</span>
+                        </div>
+                        <small class="text-secondary d-block">Blacklist & reputation analysis interface ready.</small>
+                    </div>
+                </div>
+
+                <!-- Export Placeholder -->
+                <div class="col-md-6 col-sm-12">
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="text-light small"><i class="bi bi-file-earmark-arrow-down me-1 text-success"></i> Report Export</strong>
+                            <span class="badge bg-success font-monospace" style="font-size:0.7rem;">READY</span>
+                        </div>
+                        <small class="text-secondary d-block">JSON/CSV evidence export engine ready.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {% else %}
 
     <!-- ========================================= -->
-    <!-- Generic Module View (Domain / Phone / IP / Hash) -->
+    <!-- Generic Module View (Domain / IP / Hash) -->
     <!-- ========================================= -->
 
     <div class="card dashboard-card mt-4">
@@ -684,12 +1436,22 @@ TraceLens | Investigation Results
 
     <div class="text-center mt-5">
 
+        {% if result.type == "phone" %}
+        <a href="{{ url_for('main.phone_search') }}"
+           class="btn btn-outline-info me-3">
+            <i class="bi bi-arrow-left me-1"></i> Back to Phone Search
+        </a>
+        {% elif result.type == "email" %}
+        <a href="{{ url_for('main.email_search') }}"
+           class="btn btn-outline-info me-3">
+            <i class="bi bi-arrow-left me-1"></i> Back to Email Search
+        </a>
+        {% else %}
         <a href="{{ url_for('main.search') }}"
            class="btn btn-outline-info me-3">
-
             New Investigation
-
         </a>
+        {% endif %}
 
         <button class="btn btn-info">
 

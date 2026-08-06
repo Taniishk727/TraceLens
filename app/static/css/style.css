@@ -485,4 +485,189 @@ footer{
 
 .tl-results-entry{
     animation:tlResultsFadeIn .65s cubic-bezier(.22,1,.36,1) both;
+}
+
+/* ============================================================
+   DEDICATED EMAIL SEARCH PAGE STYLES
+   ============================================================ */
+
+.email-search-page {
+    min-height: 75vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 8%;
+}
+
+.email-search-container {
+    width: 100%;
+    max-width: 750px;
+    background: #141b29;
+    padding: 45px 40px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 25px rgba(0, 212, 255, 0.08);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.email-icon-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    background: rgba(0, 212, 255, 0.1);
+    border: 2px solid rgba(0, 212, 255, 0.4);
+    border-radius: 50%;
+    color: #00f0ff;
+    font-size: 36px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+    transition: all 0.3s ease;
+}
+
+.email-icon-badge:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.45);
+}
+
+.email-heading {
+    font-size: 42px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+}
+
+.email-subtitle {
+    color: #94a3b8;
+    font-size: 17px;
+    font-weight: 400;
+    margin-bottom: 0;
+}
+
+.email-input-group {
+    position: relative;
+    width: 100%;
+}
+
+.email-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.email-input-icon {
+    position: absolute;
+    left: 20px;
+    color: #00d4ff;
+    font-size: 20px;
+    pointer-events: none;
+    transition: color 0.3s ease;
+}
+
+.email-input-field {
+    width: 100%;
+    padding: 18px 20px 18px 55px;
+    background: #1b2335;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 17px;
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.email-input-field::placeholder {
+    color: #64748b;
+}
+
+.email-input-field:focus {
+    background: #1e293b;
+    border-color: #00d4ff;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+}
+
+/* Invalid Email Highlight */
+.email-input-field.is-invalid {
+    border-color: #ff4d4d !important;
+    background: rgba(255, 77, 77, 0.05) !important;
+    box-shadow: 0 0 20px rgba(255, 77, 77, 0.35) !important;
+}
+
+.tl-email-error-msg {
+    color: #ff6b6b;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 10px;
+    padding-left: 5px;
+    text-align: left;
+    animation: tlResultsFadeIn 0.3s ease;
+}
+
+/* Option Card Clickable Link Wrapper */
+.option-card-link {
+    display: block;
+    color: inherit;
+}
+
+.option-card-link:hover .option-card {
+    border-color: #00d4ff;
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+}
+
+.email-option-card {
+    cursor: pointer;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+/* Submit and Back Buttons */
+.email-submit-btn {
+    min-width: 240px;
+    padding: 16px 32px;
+    font-size: 16px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.email-submit-btn:disabled {
+    opacity: 0.45;
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #64748b;
+    cursor: not-allowed;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.email-back-btn {
+    padding: 16px 28px;
+    font-size: 16px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 600px) {
+    .email-search-container {
+        padding: 30px 20px;
+    }
+    .email-heading {
+        font-size: 32px;
+    }
+    .email-icon-badge {
+        width: 65px;
+        height: 65px;
+        font-size: 28px;
+    }
+    .email-action-buttons {
+        flex-direction: column;
+    }
+    .email-submit-btn, .email-back-btn {
+        width: 100%;
+    }
 }

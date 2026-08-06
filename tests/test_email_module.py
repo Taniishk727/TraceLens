@@ -82,7 +82,7 @@ def test_email_engine_investigate_valid():
     assert res["target"] == "john_doe@proton.me"
     assert res["parsed"]["provider"] == "Proton Mail"
     assert res["parsed"]["provider_type"] == "public"
-    assert len(res["results"]) == 6
+    assert len(res["results"]) == 11
 
 
 def test_email_engine_investigate_invalid():

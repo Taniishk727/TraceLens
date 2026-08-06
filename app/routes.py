@@ -29,6 +29,8 @@ def home():
 # Search / Investigation
 # ----------------------------------------
 @main.route("/search", methods=["GET", "POST"])
+@main.route("/username-search", methods=["GET", "POST"])
+@main.route("/username", methods=["GET", "POST"])
 def search():
 
     if request.method == "GET":
@@ -72,3 +74,57 @@ def override():
     result = investigate(target, forced_type=forced_type)
 
     return render_template("results.html", result=result)
+
+
+# ----------------------------------------
+# Email Search
+# ----------------------------------------
+@main.route("/email-search", methods=["GET", "POST"])
+@main.route("/email", methods=["GET", "POST"])
+def email_search():
+
+    if request.method == "GET":
+        return render_template("email_search.html")
+
+    target = request.form.get("email", "").strip() or request.form.get("query", "").strip()
+
+    if not target:
+        return render_template(
+            "email_search.html",
+            error="Email address is required.",
+        )
+
+    result = investigate(target, forced_type="email")
+
+    if result.get("success") and result.get("data", {}).get("success", True):
+        return render_template("results.html", result=result)
+
+    error_msg = result.get("data", {}).get("error") or "Invalid email address."
+    return render_template("email_search.html", error=error_msg, target=target)
+
+
+# ----------------------------------------
+# Phone Search
+# ----------------------------------------
+@main.route("/phone-search", methods=["GET", "POST"])
+@main.route("/phone", methods=["GET", "POST"])
+def phone_search():
+
+    if request.method == "GET":
+        return render_template("phone_search.html")
+
+    target = request.form.get("phone", "").strip() or request.form.get("query", "").strip()
+
+    if not target:
+        return render_template(
+            "phone_search.html",
+            error="Phone number is required.",
+        )
+
+    result = investigate(target, forced_type="phone")
+
+    if result.get("success") and result.get("data", {}).get("success", True):
+        return render_template("results.html", result=result)
+
+    error_msg = result.get("data", {}).get("error") or "Invalid phone number."
+    return render_template("phone_search.html", error=error_msg, target=target)

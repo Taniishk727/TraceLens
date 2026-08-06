@@ -46,20 +46,26 @@ TraceLens | Search
 
     <div class="option-grid">
 
-        <div class="option-card">
-            <h3>Username</h3>
-            <p>Search across multiple social media platforms.</p>
-        </div>
+        <a href="{{ url_for('main.search') }}" class="option-card-link text-decoration-none">
+            <div class="option-card username-option-card">
+                <h3>Username</h3>
+                <p>Search across multiple social media platforms.</p>
+            </div>
+        </a>
 
-        <div class="option-card">
-            <h3>Email</h3>
-            <p>Check breaches, reputation and public records.</p>
-        </div>
+        <a href="{{ url_for('main.email_search') }}" class="option-card-link text-decoration-none">
+            <div class="option-card email-option-card">
+                <h3>Email</h3>
+                <p>Check breaches, reputation and public records.</p>
+            </div>
+        </a>
 
-        <div class="option-card">
-            <h3>Phone</h3>
-            <p>Gather publicly available phone information.</p>
-        </div>
+        <a href="{{ url_for('main.phone_search') }}" class="option-card-link text-decoration-none">
+            <div class="option-card phone-option-card">
+                <h3>Phone</h3>
+                <p>Gather publicly available phone information.</p>
+            </div>
+        </a>
 
         <div class="option-card">
             <h3>Domain</h3>

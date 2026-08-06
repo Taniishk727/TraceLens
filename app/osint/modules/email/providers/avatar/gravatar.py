@@ -1,0 +1,177 @@
+"""
+============================================================
+TraceLens Gravatar Avatar Provider
+============================================================
+
+Public avatar intelligence provider for Gravatar.
+Queries Gravatar avatar endpoints and public profile JSON data using MD5 hashes.
+
+Author:
+    TraceLens
+"""
+
+import hashlib
+import json
+import logging
+import time
+import urllib.error
+import urllib.request
+
+from app.osint.modules.email.providers.avatar.base import (
+    BaseAvatarProvider,
+    AvatarProviderResult,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class GravatarProvider(BaseAvatarProvider):
+    """
+    Gravatar public avatar and profile intelligence provider.
+    """
+
+    provider_name = "Gravatar"
+
+    def __init__(self, timeout: float = 5.0):
+        self.timeout = timeout
+
+    def search(self, email: str) -> AvatarProviderResult:
+        """
+        Queries Gravatar for public avatar and profile information.
+
+        Args:
+            email: Raw or normalized target email address.
+
+        Returns:
+            AvatarProviderResult containing Gravatar discovery details.
+        """
+        start_time = time.perf_counter()
+        normalized_email = self.normalize_email(email)
+        md5_hash = hashlib.md5(normalized_email.encode("utf-8")).hexdigest()
+
+        avatar_check_url = f"https://www.gravatar.com/avatar/{md5_hash}?d=404"
+        avatar_display_url = f"https://www.gravatar.com/avatar/{md5_hash}?s=200"
+        profile_json_url = f"https://en.gravatar.com/{md5_hash}.json"
+
+        logger.info(
+            "[%s] Requesting avatar lookup for email '%s' (hash: %s) -> %s",
+            self.provider_name,
+            normalized_email,
+            md5_hash,
+            avatar_check_url,
+        )
+
+        headers = {
+            "User-Agent": "TraceLens OSINT Engine/1.0 (Security Research; https://tracelens.io)",
+            "Accept": "*/*",
+        }
+
+        avatar_found = False
+        avatar_url = None
+        http_status = None
+        profile_url = None
+        display_name = None
+        metadata = {
+            "md5_hash": md5_hash,
+            "avatar_check_url": avatar_check_url,
+            "http_status": None,
+        }
+
+        # 1. Check Avatar Image Existence via d=404
+        try:
+            req = urllib.request.Request(avatar_check_url, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                http_status = resp.status
+                if resp.status == 200:
+                    avatar_found = True
+                    avatar_url = avatar_display_url
+                    logger.info(
+                        "[%s] Response HTTP %d: Custom avatar found for '%s'",
+                        self.provider_name,
+                        resp.status,
+                        normalized_email,
+                    )
+        except urllib.error.HTTPError as err:
+            http_status = err.code
+            if err.code == 404:
+                logger.info(
+                    "[%s] Response HTTP 404: No avatar found for '%s'",
+                    self.provider_name,
+                    normalized_email,
+                )
+            else:
+                logger.warning(
+                    "[%s] Response HTTP %d for '%s'",
+                    self.provider_name,
+                    err.code,
+                    normalized_email,
+                )
+        except Exception as exc:
+            logger.warning(
+                "[%s] Network error querying avatar endpoint for '%s': %s",
+                self.provider_name,
+                normalized_email,
+                exc,
+            )
+
+        metadata["http_status"] = http_status
+
+        # 2. Attempt Profile JSON retrieval
+        profile_found = False
+        try:
+            req_json = urllib.request.Request(profile_json_url, headers=headers)
+            with urllib.request.urlopen(req_json, timeout=self.timeout) as resp:
+                if resp.status == 200:
+                    raw_data = resp.read().decode("utf-8")
+                    data = json.loads(raw_data)
+                    entries = data.get("entry", [])
+                    if entries:
+                        entry = entries[0]
+                        profile_found = True
+                        display_name = entry.get("displayName") or entry.get("preferredUsername")
+                        profile_url = entry.get("profileUrl") or f"https://gravatar.com/{md5_hash}"
+                        metadata["about"] = entry.get("aboutMe")
+                        metadata["location"] = entry.get("currentLocation")
+
+                        linked_websites = []
+                        for u in entry.get("urls", []):
+                            if isinstance(u, dict) and "value" in u:
+                                linked_websites.append(u["value"])
+                            elif isinstance(u, str):
+                                linked_websites.append(u)
+                        metadata["linked_websites"] = linked_websites
+
+                        # If avatar image check didn't specify URL but profile has thumbnail
+                        if not avatar_url and entry.get("thumbnailUrl"):
+                            avatar_url = entry.get("thumbnailUrl")
+                            avatar_found = True
+        except urllib.error.HTTPError as err:
+            metadata["profile_http_status"] = err.code
+        except Exception as exc:
+            metadata["profile_error"] = str(exc)
+
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        metadata["execution_time_ms"] = elapsed_ms
+
+        is_found = avatar_found or profile_found
+        if is_found and not profile_url:
+            profile_url = f"https://gravatar.com/{md5_hash}"
+
+        logger.info(
+            "[%s] Result for '%s': Found=%s, Status=%s, ExecTime=%.2fms",
+            self.provider_name,
+            normalized_email,
+            is_found,
+            http_status,
+            elapsed_ms,
+        )
+
+        return AvatarProviderResult(
+            provider=self.provider_name,
+            available=True,
+            found=is_found,
+            avatar_url=avatar_url if is_found else None,
+            profile_url=profile_url if is_found else None,
+            display_name=display_name,
+            metadata=metadata,
+        )

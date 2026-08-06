@@ -16,7 +16,7 @@ from typing import Any
 import dns.resolver
 import dns.exception
 
-from app.osint.modules.email.engine import BaseCollector
+from app.osint.modules.email.base import BaseCollector
 from app.osint.modules.email.validator import (
     EmailValidationResult,
     PUBLIC_PROVIDERS,

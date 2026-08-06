@@ -18,10 +18,10 @@ Responsibilities
 from app.osint.modules.username.investigation import detect_target
 from app.osint.modules.username import username
 from app.osint.modules.email import engine as email
+from app.osint.modules.phone import engine as phone_mod
 from app.osint.parsers import (
     domain,
     ip,
-    phone,
     hash
 )
 # REQUESTS_TRANSPORT = RequestsTransport()
@@ -36,7 +36,7 @@ MODULE_REGISTRY = {
 
     "ip": ip.investigate,
 
-    "phone": phone.investigate,
+    "phone": phone_mod.investigate,
 
     "md5": hash.investigate,
 
