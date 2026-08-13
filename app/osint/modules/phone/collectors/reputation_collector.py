@@ -1,32 +1,12 @@
 """
 ============================================================
-TraceLens Phone Reputation Collector (Placeholder)
+TraceLens Phone Reputation Collector Module Re-export
 ============================================================
 
-Future-ready placeholder interface for phone reputation and blacklists.
+Maintains backward-compatibility by re-exporting ReputationCollector
+from the dedicated reputation subpackage.
 """
 
-from typing import Any
-from app.osint.modules.phone.base import BasePhoneCollector
-from app.osint.modules.phone.validator import PhoneValidationResult
+from app.osint.modules.phone.collectors.reputation.collector import ReputationCollector
 
-
-class ReputationCollector(BasePhoneCollector):
-    """Placeholder collector for phone reputation analysis."""
-
-    def __init__(self):
-        super().__init__(
-            name="Reputation Collector",
-            category="Reputation",
-            enabled=True
-        )
-
-    def collect(self, validation: PhoneValidationResult) -> dict[str, Any]:
-        return {
-            "collector": self.name,
-            "category": self.category,
-            "status": "placeholder",
-            "reputation_status": "Clean",
-            "blacklisted": False,
-            "notes": "Reputation interface ready for integration."
-        }
+__all__ = ["ReputationCollector"]

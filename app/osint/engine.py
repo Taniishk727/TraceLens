@@ -38,6 +38,8 @@ MODULE_REGISTRY = {
 
     "phone": phone_mod.investigate,
 
+    "hash": hash.investigate,
+
     "md5": hash.investigate,
 
     "sha1": hash.investigate,
@@ -48,9 +50,14 @@ MODULE_REGISTRY = {
 
     "sha384": hash.investigate,
 
-    "sha512": hash.investigate
+    "sha512": hash.investigate,
+
+    "bcrypt": hash.investigate,
+
+    "argon2": hash.investigate,
 
 }
+
 
 
 # ==========================================================

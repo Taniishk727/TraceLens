@@ -40,6 +40,7 @@ class PhoneValidationResult:
     number_type: str
     is_valid: bool
     is_possible: bool
+    carrier_name: Optional[str] = None
     error: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -133,10 +134,11 @@ class PhoneValidator:
         intl_fmt = phonenumbers.format_number(parsed_num, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
         nat_fmt = phonenumbers.format_number(parsed_num, phonenumbers.PhoneNumberFormat.NATIONAL)
 
-        # Geocoder & metadata extraction
+        # Geocoder & carrier metadata extraction
         reg_code = phonenumbers.region_code_for_number(parsed_num) or "GLOBAL"
         country_desc = geocoder.country_name_for_number(parsed_num, "en") or reg_code
         location_desc = geocoder.description_for_number(parsed_num, "en") or country_desc
+        carrier_desc = carrier.name_for_number(parsed_num, "en") or None
 
         # Timezones
         tz_list = timezone.time_zones_for_number(parsed_num)
@@ -161,5 +163,6 @@ class PhoneValidator:
             number_type=num_type_str,
             is_valid=is_valid,
             is_possible=is_possible,
+            carrier_name=carrier_desc,
             error=None
         )

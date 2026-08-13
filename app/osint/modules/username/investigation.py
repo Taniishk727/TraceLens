@@ -128,41 +128,32 @@ def validate_phone(target):
 # ==========================================================
 
 def validate_hash(target):
+    from app.osint.modules.hash.validator import HashValidator
+    from app.osint.modules.hash.detector import HashDetector
 
-    if not re.fullmatch(r'[A-Fa-f0-9]+', target):
-        return None
-
-    hashes = {
-
-        32: "md5",
-
-        40: "sha1",
-
-        56: "sha224",
-
-        64: "sha256",
-
-        96: "sha384",
-
-        128: "sha512"
-
-    }
-
-    if len(target) in hashes:
-
+    val = HashValidator.validate(target)
+    if not val.valid:
         return {
-            "valid": True,
-            "type": hashes[len(target)]
+            "valid": False,
+            "candidate": "hash",
+            "reason": val.error or "Invalid hash input.",
+            "details": val.details,
+            "suggestions": ["username"]
+        }
+
+    det = HashDetector.detect(val)
+    if det.status.value == "unknown":
+        return {
+            "valid": False,
+            "candidate": "hash",
+            "reason": "Unknown hash length or format.",
+            "details": [f"Length = {val.length}"],
+            "suggestions": ["username"]
         }
 
     return {
-        "valid": False,
-        "candidate": "hash",
-        "reason": "Unknown hash length.",
-        "details": [
-            f"Length = {len(target)}"
-        ],
-        "suggestions": ["username"]
+        "valid": True,
+        "type": "hash"
     }
 
 
@@ -225,6 +216,9 @@ def identify_candidate(target):
 
     if "." in target:
         return "domain"
+
+    if target.startswith(("$2", "$argon2", "$1$", "$5$", "$6$", "$apr1$", "$P$", "$H$", "*")):
+        return "hash"
 
     if re.fullmatch(r'[A-Fa-f0-9]+', target):
         return "hash"

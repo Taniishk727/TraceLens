@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, jsonify
 
 from app.osint.engine import investigate
 from app.osint.modules.username.data.username_sites import SITES
 
 main = Blueprint("main", __name__)
+
 
 
 # Pre-build the slim platform list once at import time for the animation.
@@ -128,3 +129,64 @@ def phone_search():
 
     error_msg = result.get("data", {}).get("error") or "Invalid phone number."
     return render_template("phone_search.html", error=error_msg, target=target)
+
+
+# ----------------------------------------
+# Hash Search
+# ----------------------------------------
+@main.route("/hash-search", methods=["GET", "POST"])
+@main.route("/hash", methods=["GET", "POST"])
+def hash_search():
+
+    if request.method == "GET":
+        return render_template("hash_search.html")
+
+    target = request.form.get("hash", "").strip() or request.form.get("query", "").strip()
+
+    if not target:
+        return render_template(
+            "hash_search.html",
+            error="Hash input is required.",
+        )
+
+    result = investigate(target, forced_type="hash")
+
+    if result.get("success") and result.get("data", {}).get("valid", True):
+        return render_template("results.html", result=result)
+
+    data = result.get("data", {})
+    details = data.get("details", [])
+    error_msg = data.get("error") or (details[0] if isinstance(details, list) and details else "Invalid hash input.")
+    return render_template("hash_search.html", error=error_msg, target=target)
+
+
+# ----------------------------------------
+# Hash API Endpoint
+# ----------------------------------------
+@main.route("/api/hash/investigate", methods=["POST"])
+def api_hash_investigate():
+    data = request.get_json(silent=True) or {}
+    raw_hash = data.get("hash") or data.get("query") or request.form.get("hash") or request.form.get("query") or ""
+
+    from app.osint.modules.hash.engine import investigate as hash_investigate
+    result = hash_investigate(raw_hash)
+
+    response_payload = {
+        "success": result["success"],
+        "input": result["input"],
+        "normalized": result["normalized"],
+        "status": result["status"],
+        "possible_types": result["possible_types"],
+        "confidence": result["confidence"],
+        "length": result["length"],
+        "encoding": result["encoding"],
+        "hash_type": result["hash_type"],
+        "details": result["details"],
+        "matches": result["matches"],
+        "identification": result.get("identification", {}),
+        "lookup": result.get("lookup", {}),
+        "summary": result.get("summary", {}),
+        "metadata": result["metadata"]
+    }
+    status_code = 200 if result["valid"] or result["status"] != "invalid" else 400
+    return jsonify(response_payload), status_code

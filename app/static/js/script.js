@@ -5,6 +5,7 @@
  * - Universal Search (/search)
  * - Dedicated Email Search (/email-search)
  * - Dedicated Phone Search (/phone-search)
+ * - Dedicated Hash Search (/hash-search)
  */
 
 (function (global) {
@@ -107,7 +108,6 @@
       return { valid: false, normalized: '', error: 'Phone number is required.' };
     }
 
-    // Reject letters
     if (/[a-zA-Z]/.test(raw)) {
       return { valid: false, normalized: raw, error: 'Invalid phone number format.' };
     }
@@ -132,9 +132,88 @@
     };
   }
 
+  /**
+   * Reusable Hash Input Validation Utility Function
+   * @param {string} hash
+   * @returns {{ valid: boolean, normalized: string, error: string | null }}
+   */
+  function validateHashInput(hash) {
+    if (hash === null || hash === undefined) {
+      return { valid: false, normalized: '', error: 'Please enter a hash.' };
+    }
+
+    var raw = String(hash);
+    var trimmed = raw.trim();
+
+    if (!trimmed) {
+      return { valid: false, normalized: '', error: 'Please enter a hash.' };
+    }
+
+    if (/\s/.test(trimmed)) {
+      return { valid: false, normalized: trimmed, error: 'Hash input contains internal whitespace.' };
+    }
+
+    return {
+      valid: true,
+      normalized: trimmed,
+      error: null
+    };
+  }
+
+  /**
+   * Copy-to-clipboard helper function with UI feedback
+   * @param {string} text
+   * @param {HTMLElement} btnEl
+   */
+  function copyToClipboard(text, btnEl) {
+    if (!text) return;
+
+    var originalHtml = btnEl ? btnEl.innerHTML : '';
+
+    function showFeedback() {
+      if (btnEl) {
+        btnEl.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
+        btnEl.classList.add('btn-success');
+        btnEl.classList.remove('btn-outline-secondary', 'btn-outline-info');
+        setTimeout(function () {
+          btnEl.innerHTML = originalHtml;
+          btnEl.classList.remove('btn-success');
+          btnEl.classList.add('btn-outline-secondary');
+        }, 2000);
+      }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showFeedback).catch(function () {
+        fallbackCopy(text, showFeedback);
+      });
+    } else {
+      fallbackCopy(text, showFeedback);
+    }
+  }
+
+  function fallbackCopy(text, callback) {
+    var textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      if (callback) callback();
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+    }
+    document.body.removeChild(textArea);
+  }
+
   // Export utilities globally
   global.validateEmail = validateEmail;
   global.validatePhoneNumber = validatePhoneNumber;
+  global.validateHashInput = validateHashInput;
+  global.copyToClipboard = copyToClipboard;
 
   document.addEventListener('DOMContentLoaded', function () {
     // --------------------------------------------------------
@@ -148,11 +227,14 @@
         var queryVal = searchInput ? searchInput.value.trim() : '';
         var emailVal = validateEmail(queryVal);
         var phoneVal = validatePhoneNumber(queryVal);
+        var hashVal = validateHashInput(queryVal);
 
         if (emailVal.valid && typeof TraceLensEmailLoader !== 'undefined') {
           TraceLensEmailLoader.start(emailVal.normalized);
         } else if (phoneVal.valid && typeof TraceLensPhoneLoader !== 'undefined') {
           TraceLensPhoneLoader.start(phoneVal.normalized);
+        } else if (hashVal.valid && typeof TraceLensHashLoader !== 'undefined' && (queryVal.length >= 16 || queryVal.startsWith('$'))) {
+          TraceLensHashLoader.start(hashVal.normalized);
         } else if (typeof TraceLensLoader !== 'undefined' && window.TL_PLATFORMS) {
           TraceLensLoader.start(window.TL_PLATFORMS);
         }
@@ -304,6 +386,81 @@
 
           if (typeof TraceLensPhoneLoader !== 'undefined') {
             TraceLensPhoneLoader.start(res.normalized);
+          }
+        });
+      }
+    }
+
+    // --------------------------------------------------------
+    // 4. Dedicated Hash Search Form (/hash-search)
+    // --------------------------------------------------------
+    var hashForm = document.getElementById('tl-hash-search-form');
+    if (hashForm) {
+      var hashInput = document.getElementById('tl-hash-input');
+      var hashSubmitBtn = document.getElementById('tl-hash-submit-btn');
+      var hashSpinnerEl = document.getElementById('tl-hash-btn-spinner');
+      var hashBtnTextEl = document.getElementById('tl-hash-btn-text');
+      var hashErrorMsgEl = document.getElementById('tl-hash-error-msg');
+      var hashErrorTextEl = document.getElementById('tl-hash-error-text');
+
+      if (hashInput && hashSubmitBtn) {
+        hashInput.focus();
+
+        function updateHashValidationState(showInlineError) {
+          var val = hashInput.value;
+          var res = validateHashInput(val);
+
+          if (!val.trim()) {
+            hashSubmitBtn.disabled = true;
+            hashInput.classList.remove('is-invalid');
+            if (hashErrorMsgEl) hashErrorMsgEl.style.display = 'none';
+            return res;
+          }
+
+          if (res.valid) {
+            hashSubmitBtn.disabled = false;
+            hashInput.classList.remove('is-invalid');
+            if (hashErrorMsgEl) hashErrorMsgEl.style.display = 'none';
+          } else {
+            hashSubmitBtn.disabled = true;
+            if (showInlineError) {
+              hashInput.classList.add('is-invalid');
+              if (hashErrorMsgEl && hashErrorTextEl) {
+                hashErrorTextEl.textContent = res.error || 'Please enter a valid hash.';
+                hashErrorMsgEl.style.display = 'block';
+              }
+            } else {
+              hashInput.classList.remove('is-invalid');
+              if (hashErrorMsgEl) hashErrorMsgEl.style.display = 'none';
+            }
+          }
+          return res;
+        }
+
+        hashInput.addEventListener('input', function () { updateHashValidationState(true); });
+        hashInput.addEventListener('keyup', function () { updateHashValidationState(true); });
+        hashInput.addEventListener('paste', function () { setTimeout(function () { updateHashValidationState(true); }, 10); });
+        hashInput.addEventListener('blur', function () { if (hashInput.value.trim().length > 0) updateHashValidationState(true); });
+
+        if (hashInput.value.trim().length > 0) updateHashValidationState(true);
+        else hashSubmitBtn.disabled = true;
+
+        hashForm.addEventListener('submit', function (e) {
+          var res = validateHashInput(hashInput.value);
+          if (!res.valid) {
+            e.preventDefault();
+            updateHashValidationState(true);
+            hashInput.focus();
+            return false;
+          }
+
+          hashInput.value = res.normalized;
+          hashSubmitBtn.disabled = true;
+          if (hashSpinnerEl) hashSpinnerEl.classList.remove('d-none');
+          if (hashBtnTextEl) hashBtnTextEl.innerHTML = 'Analyzing Hash...';
+
+          if (typeof TraceLensHashLoader !== 'undefined') {
+            TraceLensHashLoader.start(res.normalized);
           }
         });
       }

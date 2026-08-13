@@ -77,10 +77,13 @@ TraceLens | Search
             <p>Geolocation, ASN and network intelligence.</p>
         </div>
 
-        <div class="option-card">
-            <h3>Hash</h3>
-            <p>Identify common hashes and malware indicators.</p>
-        </div>
+        <a href="{{ url_for('main.hash_search') }}" class="option-card-link text-decoration-none">
+            <div class="option-card hash-option-card">
+                <h3>Hash Investigation</h3>
+                <p>Identify and analyze hash formats.</p>
+            </div>
+        </a>
+
 
     </div>
 

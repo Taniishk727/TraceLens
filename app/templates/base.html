@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/email-loader.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hash-loader.css') }}">
 
 </head>
 
@@ -86,6 +87,12 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.phone_search') }}">
                             Phone Search
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.hash_search') }}">
+                            Hash Search
                         </a>
                     </li>
 
@@ -163,6 +170,7 @@
 
     <script src="{{ url_for('static', filename='js/email-loader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/phone-loader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/hash-loader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 </body>

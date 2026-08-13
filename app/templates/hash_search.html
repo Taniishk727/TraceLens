@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}
+Hash Investigation | TraceLens
+{% endblock %}
+
+{% block content %}
+
+<section class="search-page email-search-page">
+
+    <div class="search-container email-search-container">
+
+        <div class="email-search-header text-center mb-4">
+            <div class="email-icon-badge mb-3" style="color: #00d4ff; border-color: rgba(0, 212, 255, 0.4);">
+                <i class="bi bi-hash"></i>
+            </div>
+            <h1 class="email-heading">Hash Investigation</h1>
+            <p class="email-subtitle">
+                Identify and analyze hash formats
+            </p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show mb-4 border-0 shadow" role="alert" style="background-color: rgba(220, 53, 69, 0.2); border-left: 4px solid #dc3545 !important; color: #ff8080;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ error }}
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <form id="tl-hash-search-form" action="{{ url_for('main.hash_search') }}" method="POST" class="email-search-form" novalidate>
+
+            <div class="email-input-group mb-4">
+                <label for="tl-hash-input" class="form-label text-secondary font-monospace small mb-2 d-block text-start">
+                    <i class="bi bi-key-fill me-1 text-info"></i> Hash Input
+                </label>
+                <div class="email-input-wrapper">
+                    <i class="bi bi-hash email-input-icon"></i>
+                    <input
+                        type="text"
+                        id="tl-hash-input"
+                        name="hash"
+                        class="email-input-field font-monospace"
+                        placeholder="Enter MD5, SHA-1, SHA-256, bcrypt..."
+                        value="{{ target or '' }}"
+                        required
+                        autocomplete="off"
+                        autofocus
+                    >
+                </div>
+                <div id="tl-hash-error-msg" class="tl-email-error-msg" style="display: none;">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i> <span id="tl-hash-error-text">Please enter a hash.</span>
+                </div>
+            </div>
+
+            <div class="email-action-buttons d-flex justify-content-center gap-3 flex-wrap">
+
+                <button type="submit" id="tl-hash-submit-btn" class="btn primary btn-lg email-submit-btn" disabled>
+                    <span id="tl-hash-btn-spinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                    <span id="tl-hash-btn-text"><i class="bi bi-search me-2"></i>Investigate Hash</span>
+                </button>
+
+                <a href="{{ url_for('main.home') }}" class="btn secondary btn-lg email-back-btn">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Home
+                </a>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</section>
+
+{% endblock %}

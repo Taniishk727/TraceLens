@@ -1,0 +1,381 @@
+/* ============================================================
+   TraceLens Hash Investigation Cyber Dashboard Loader
+   ============================================================ */
+
+/* Fullscreen Overlay */
+#tl-hash-loader-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at 50% 50%, #0d1527 0%, #060a12 100%);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30px;
+  box-sizing: border-box;
+  color: #f1f5f9;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Background Cyber Grid Pattern */
+#tl-hash-loader-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  background-image: 
+    linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+  animation: hashGridMove 25s linear infinite;
+}
+
+@keyframes hashGridMove {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-40px, -40px); }
+}
+
+/* Top Header Bar */
+.tl-hash-loader-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+  padding-bottom: 15px;
+}
+
+.tl-hash-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tl-hash-brand-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid #00d4ff;
+  color: #00d4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+.tl-hash-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #ffffff;
+  margin: 0;
+}
+
+.tl-hash-subtitle {
+  font-size: 0.75rem;
+  color: #00d4ff;
+  letter-spacing: 1.5px;
+  font-family: monospace;
+}
+
+/* Target Hash Badge Pill */
+.tl-hash-target-pill {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  border-radius: 30px;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.tl-hash-target-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+.tl-hash-target-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #00d4ff;
+  font-family: monospace;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Main Pipeline Container */
+.tl-hash-pipeline-container {
+  position: relative;
+  z-index: 2;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+}
+
+/* Pipeline Stage Grid */
+.tl-hash-stages-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1000px;
+  position: relative;
+  padding: 0 20px;
+}
+
+/* SVG Line Connection Overlay */
+.tl-hash-svg-connectors {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  transform: translateY(-50%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.tl-hash-line-bg {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 3;
+}
+
+.tl-hash-line-active {
+  stroke: url(#cyanPurpleGrad);
+  stroke-width: 3;
+  stroke-dasharray: 8 6;
+  animation: hashDashMove 1s linear infinite;
+}
+
+@keyframes hashDashMove {
+  to { stroke-dashoffset: -14; }
+}
+
+/* Stage Card / Node */
+.tl-hash-stage-card {
+  position: relative;
+  z-index: 3;
+  width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.4s ease;
+}
+
+.tl-hash-stage-icon-ring {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  position: relative;
+  background: #0f172a;
+  border: 2px solid #334155;
+  color: #64748b;
+  transition: all 0.4s ease;
+}
+
+/* Stage States */
+.tl-hash-stage-card.pending .tl-hash-stage-icon-ring {
+  border-color: #334155;
+  color: #64748b;
+  opacity: 0.6;
+}
+
+.tl-hash-stage-card.pending .tl-hash-stage-name {
+  color: #64748b;
+}
+
+.tl-hash-stage-card.active .tl-hash-stage-icon-ring {
+  border-color: #00d4ff;
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 25px rgba(0, 212, 255, 0.6), inset 0 0 15px rgba(0, 212, 255, 0.3);
+  animation: pulseCyanHash 1.5s infinite;
+}
+
+@keyframes pulseCyanHash {
+  0% { transform: scale(1); box-shadow: 0 0 20px rgba(0, 212, 255, 0.5); }
+  50% { transform: scale(1.08); box-shadow: 0 0 35px rgba(0, 212, 255, 0.9); }
+  100% { transform: scale(1); box-shadow: 0 0 20px rgba(0, 212, 255, 0.5); }
+}
+
+.tl-hash-stage-card.active .tl-hash-stage-name {
+  color: #00d4ff;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+}
+
+.tl-hash-stage-card.completed .tl-hash-stage-icon-ring {
+  border-color: #10b981;
+  color: #ffffff;
+  background: #10b981;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.5);
+}
+
+.tl-hash-stage-card.completed .tl-hash-stage-name {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.tl-hash-stage-name {
+  font-size: 0.78rem;
+  margin-top: 12px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  line-height: 1.2;
+}
+
+.tl-hash-stage-status-badge {
+  font-size: 0.65rem;
+  font-family: monospace;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.tl-hash-stage-card.pending .tl-hash-stage-status-badge {
+  background: rgba(51, 65, 85, 0.5);
+  color: #94a3b8;
+}
+
+.tl-hash-stage-card.active .tl-hash-stage-status-badge {
+  background: rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+  border: 1px solid rgba(0, 212, 255, 0.5);
+}
+
+.tl-hash-stage-card.completed .tl-hash-stage-status-badge {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+/* Center Glowing Hash Packet Animation */
+#tl-hash-packet-core {
+  position: absolute;
+  z-index: 10;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid #00d4ff;
+  border-radius: 20px;
+  padding: 6px 14px;
+  color: #ffffff;
+  font-family: monospace;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.7);
+  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate(-50%, -50%);
+  top: 50%;
+  pointer-events: none;
+}
+
+#tl-hash-packet-core i {
+  color: #00d4ff;
+  animation: spinHash 3s linear infinite;
+}
+
+@keyframes spinHash {
+  100% { transform: rotate(360deg); }
+}
+
+/* Bottom Telemetry & Progress Panel */
+.tl-hash-loader-footer {
+  position: relative;
+  z-index: 2;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 12px;
+  padding: 18px 25px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.tl-hash-telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.tl-hash-collector-name {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tl-hash-collector-name span {
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+.tl-hash-timer {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.tl-hash-timer span {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.tl-hash-progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.tl-hash-progress-bar-bg {
+  flex-grow: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tl-hash-progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00d4ff, #a855f7);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.8);
+  transition: width 0.4s ease;
+}
+
+.tl-hash-progress-percent {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #00d4ff;
+  font-family: monospace;
+  min-width: 45px;
+  text-align: right;
+}
