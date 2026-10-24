@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tracelens-osint"
+version = "0.1.0"
+description = "OSINT investigations with a shared Linux CLI and Flask web interface"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.1,<4",
+    "requests>=2.31,<3",
+    "phonenumbers>=9.0",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.45"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+tracelens = "app.cli:main"
+tracelens-web = "app.web:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+app = [
+    "templates/*.html",
+    "static/css/*.css",
+    "static/js/*.js",
+    "osint/modules/username/data/*.txt",
+    "osint/modules/email/data/*.txt",
+    "osint/modules/email/providers/*.json",
+    "osint/modules/email/providers/*.txt",
+    "osint/modules/email/providers/avatar/*.txt",
+]

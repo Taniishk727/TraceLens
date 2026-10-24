@@ -13,10 +13,12 @@ Architecture changes from v3
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
+import threading
 import time
 
 from app.osint.core.transport.requests_transport import RequestsTransport
-from app.osint.core.transport.browser_transport import BrowserTransport
+from app.osint.core.transport.browser_transport import BrowserTransport, BROWSER_WORKERS
 from app.osint.modules.username.data.username_sites import SITES
 from app.osint.modules.username.detectors.registry import get_detector
 from app.osint.modules.username.profiler import EngineProfiler
@@ -25,7 +27,43 @@ from app.osint.modules.username.profiler import EngineProfiler
 # One shared instance per process — browser workers stay alive across investigations.
 MAX_WORKERS = min(16, len(SITES))
 REQUESTS_TRANSPORT = RequestsTransport()
-BROWSER_TRANSPORT = BrowserTransport()
+
+
+class LazyBrowserTransport:
+    """Start the optional browser pool only when a browser request is needed."""
+
+    def __init__(self):
+        self.num_workers = BROWSER_WORKERS
+        self._transport = None
+        self.timeout_override = None
+        self._lock = threading.Lock()
+
+    def set_timeout(self, timeout_seconds):
+        self.timeout_override = float(timeout_seconds)
+        if self._transport is not None:
+            self._transport.max_timeout = self.timeout_override * 1000
+
+    def _get_transport(self):
+        if self._transport is None:
+            with self._lock:
+                if self._transport is None:
+                    self._transport = BrowserTransport(
+                        num_workers=self.num_workers,
+                        max_timeout=self.timeout_override * 1000 if self.timeout_override else None,
+                    )
+        return self._transport
+
+    def fetch(self, url, *args, **kwargs):
+        return self._get_transport().fetch(url, *args, **kwargs)
+
+    def get_pool_stats(self):
+        if self._transport is None:
+            return {"num_workers": self.num_workers, "total_tasks": 0}
+        return self._transport.get_pool_stats()
+
+
+BROWSER_TRANSPORT = LazyBrowserTransport()
+logger = logging.getLogger(__name__)
 
 
 STATUS_PRIORITY = {
@@ -225,7 +263,7 @@ def investigate(username: str) -> dict:
     profiler.end_investigation()
 
     # Print the performance report to stdout
-    profiler.print_report()
+    logger.debug("%s", profiler.generate_report())
 
     profiles.sort(
         key=lambda p: (STATUS_PRIORITY.get(p["status"], 99), p["site"])

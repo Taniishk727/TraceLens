@@ -1,88 +1,31 @@
+"""TraceLens application package.
 
-"""
-============================================================
-TraceLens Application Factory
-============================================================
-
-Initializes the Flask application and validates the OSINT
-framework before the server starts.
-
-Author:
-TraceLens
+The Flask dependency and web routes are loaded only when ``create_app`` is
+called. Core investigations can therefore be imported by the CLI without
+initializing the web application.
 """
 
-from flask import Flask
+__version__ = "0.1.0"
 
-from app.routes import main
-
-from app.osint.modules.username.data.validator import validate_sites
-
-
-# ==========================================================
-# APPLICATION FACTORY
-# ==========================================================
 
 def create_app():
+    """Create and configure the Flask web application."""
+    from app.config import load_user_config
 
-    app = Flask(__name__)
+    load_user_config()
+    from flask import Flask
 
-    # ------------------------------------------------------
-    # Register Blueprints
-    # ------------------------------------------------------
-
-    app.register_blueprint(main)
-
-    # ------------------------------------------------------
-    # Validate Username Site Database
-    # ------------------------------------------------------
+    from app.routes import main
+    from app.osint.modules.username.data.validator import validate_sites
 
     report = validate_sites()
-
-    print("\n")
-
-    print("=" * 60)
-    print("TraceLens OSINT Engine")
-    print("=" * 60)
-
-    print(f"Loaded Sites        : {report['total_sites']}")
-    print(f"Registered Detectors: {report['registered_detectors']}")
-
-    if report["valid"]:
-
-        print("Validation          : PASSED")
-
-    else:
-
-        print("Validation          : FAILED")
-
-        print()
-
-        for error in report["errors"]:
-
-            print(
-                f"[ERROR] "
-                f"{error['site']} | "
-                f"{error['type']} | "
-                f"{error['message']}"
-            )
-
-        for warning in report["warnings"]:
-
-            print(
-                f"[WARNING] "
-                f"{warning['site']} | "
-                f"{warning['message']}"
-            )
-
-        print("=" * 60)
-
-        raise RuntimeError(
-            "TraceLens failed to start because the "
-            "Username Site Database contains errors."
+    if not report["valid"]:
+        messages = "; ".join(
+            f"{error['site']} ({error['type']}): {error['message']}"
+            for error in report["errors"]
         )
+        raise RuntimeError(f"Username site configuration is invalid: {messages}")
 
-    print("=" * 60)
-
-    print("[OK] TraceLens initialized successfully.\n")
-
-    return app
+    application = Flask(__name__)
+    application.register_blueprint(main)
+    return application

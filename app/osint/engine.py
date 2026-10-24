@@ -83,6 +83,49 @@ def run_module(target, target_type):
     return module(target)
 
 
+def configure_timeout(timeout_seconds):
+    """Apply a CLI timeout override to network collectors where supported.
+
+    System DNS calls may still use the operating system's resolver timeout.
+    """
+    timeout_seconds = float(timeout_seconds)
+    if timeout_seconds <= 0:
+        raise ValueError("Timeout must be greater than zero.")
+
+    from app.osint.modules.hash.lookup.registry import _LOOKUP_REGISTRY
+
+    roots = [
+        username.REQUESTS_TRANSPORT,
+        username.BROWSER_TRANSPORT,
+        email._ENGINE,
+        phone_mod._ENGINE,
+        _LOOKUP_REGISTRY,
+    ]
+    pending = list(roots)
+    seen = set()
+    child_attributes = ("_collectors", "_sources", "providers", "provider", "transport", "_transport")
+    while pending:
+        item = pending.pop()
+        if item is None or id(item) in seen:
+            continue
+        seen.add(id(item))
+        for attribute in ("timeout", "dns_timeout", "smtp_timeout"):
+            if attribute == "timeout" and hasattr(item, "max_timeout"):
+                continue  # BrowserTransport uses milliseconds and has a separate cap.
+            value = getattr(item, attribute, None)
+            if isinstance(value, (int, float)):
+                setattr(item, attribute, timeout_seconds)
+        set_timeout = getattr(item, "set_timeout", None)
+        if callable(set_timeout):
+            set_timeout(timeout_seconds)
+        for attribute in child_attributes:
+            child = getattr(item, attribute, None)
+            if isinstance(child, (list, tuple, set)):
+                pending.extend(child)
+            elif child is not None:
+                pending.append(child)
+
+
 # ==========================================================
 # MAIN ENGINE
 # ==========================================================

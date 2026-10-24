@@ -60,12 +60,14 @@ class BrowserTransport:
         wait_time=3000,         # Kept for reference; condition-based waits are used instead
         viewport=(1366, 768),
         num_workers=BROWSER_WORKERS,
+        max_timeout=None,
     ):
         self.headless = headless
         self.timeout = timeout
         self.wait_time = wait_time
         self.viewport = viewport
         self.num_workers = num_workers
+        self.max_timeout = max_timeout
 
         # Shared task queue — all workers drain this concurrently
         self._task_queue = queue.Queue()
@@ -230,6 +232,8 @@ class BrowserTransport:
         is_tryhackme = "tryhackme.com" in url.lower()
         is_heavy = any(h in url.lower() for h in ("replit.com", "hashnode.com"))
         nav_timeout = 60000 if is_tumblr else (15000 if (is_heavy or is_tryhackme) else (12000 if (is_instagram or is_facebook or is_pinterest) else self.timeout))
+        if self.max_timeout is not None:
+            nav_timeout = min(nav_timeout, self.max_timeout)
 
         try:
             # ── Page creation (reusing context, not recreating) ──

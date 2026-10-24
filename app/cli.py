@@ -1,0 +1,289 @@
+"""Command-line interface for TraceLens investigations."""
+
+import argparse
+from contextlib import redirect_stdout
+import json
+import sys
+import threading
+import time
+from pathlib import Path
+from typing import Any
+
+from app import __version__
+
+SUPPORTED_TYPES = (
+    "username", "email", "domain", "ip", "phone", "hash", "md5", "sha1",
+    "sha224", "sha256", "sha384", "sha512", "bcrypt", "argon2",
+)
+
+
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_INVALID = 2
+EXIT_PARTIAL = 3
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("timeout must be a number of seconds") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("timeout must be greater than zero")
+    return parsed
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="tracelens",
+        description="Investigate usernames, email addresses, phone numbers, domains, IPs, and hashes.",
+    )
+    parser.add_argument("--version", action="version", version=f"TraceLens {__version__}")
+    commands = parser.add_subparsers(dest="command", required=True)
+    run = commands.add_parser("investigate", help="run an investigation")
+    run.add_argument("target", help="target value to investigate")
+    run.add_argument(
+        "--type",
+        choices=SUPPORTED_TYPES,
+        help="force a target type instead of detecting it automatically",
+    )
+    run.add_argument("--format", choices=("text", "json"), default="text", help="output format")
+    run.add_argument("--timeout", type=_positive_float, metavar="SECONDS", help="override supported collector network timeouts")
+    run.add_argument("--output", "-o", metavar="FILE", help="write the result to a file")
+    run.add_argument(
+        "--show-plaintext",
+        action="store_true",
+        help="include plaintext recovered by hash lookups in output",
+    )
+    run.add_argument("--quiet", "-q", action="store_true", help="disable the elapsed-time indicator")
+    return parser
+
+
+def _redact(value: Any, include_sensitive: bool) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: ("[redacted]" if key.lower() == "plaintext" and not include_sensitive else _redact(item, include_sensitive))
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(item, include_sensitive) for item in value]
+    if isinstance(value, tuple):
+        return [_redact(item, include_sensitive) for item in value]
+    return value
+
+
+def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
+    output = _redact(result, include_sensitive)
+    lines = [
+        f"TraceLens — {str(output.get('type') or output.get('candidate') or 'Investigation').title()}",
+        f"Target: {output.get('target', '')}",
+        f"Status: {output.get('status') or ('completed' if output.get('success') else 'failed')}",
+    ]
+    if output.get("investigation_id"):
+        lines.append(f"Run ID: {output['investigation_id']}")
+
+    data = output.get("data")
+    if not isinstance(data, dict):
+        if output.get("reason"):
+            lines.append(f"Reason: {output['reason']}")
+        for detail in output.get("details", []):
+            lines.append(f"  - {detail}")
+        return "\n".join(lines)
+
+    lines.append(f"Module: {data.get('module', 'Unknown')}")
+    summary = data.get("summary")
+    if isinstance(summary, str):
+        lines.append(f"Summary: {summary}")
+    elif isinstance(summary, dict):
+        lines.append("Summary:")
+        for key, value in summary.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                lines.append(f"  {key.replace('_', ' ').title()}: {value}")
+
+    details = data.get("details")
+    if isinstance(details, dict):
+        lines.append("Details:")
+        lines.extend(f"  {key.replace('_', ' ').title()}: {value}" for key, value in details.items())
+    elif isinstance(details, list) and details:
+        lines.append("Details:")
+        lines.extend(f"  - {item}" for item in details)
+
+    identity = data.get("identity_summary")
+    if isinstance(identity, dict):
+        lines.append("Identity assessment:")
+        for key in ("confidence", "profiles_found", "evidence_count", "primary_identity"):
+            if identity.get(key) is not None:
+                lines.append(f"  {key.replace('_', ' ').title()}: {identity[key]}")
+
+    evidence = data.get("evidence")
+    if isinstance(evidence, list) and evidence:
+        lines.append("Evidence:")
+        for item in evidence:
+            if isinstance(item, dict):
+                label = item.get("type", "Finding")
+                value = item.get("value", "")
+                source = item.get("provider") or item.get("source")
+                lines.append(f"  - {label}: {value}" + (f" ({source})" if source else ""))
+
+    usernames = data.get("discovered_usernames")
+    if isinstance(usernames, list) and usernames:
+        lines.append("Discovered usernames:")
+        for item in usernames:
+            if isinstance(item, dict):
+                lines.append(f"  - {item.get('username', '')} ({item.get('provider', 'unknown')})")
+
+    profiles = data.get("profiles")
+    if isinstance(profiles, list):
+        lines.append("Platform checks:")
+        for profile in profiles:
+            if profile.get("status") == "Found":
+                lines.append(f"  [Found] {profile.get('site')}: {profile.get('url', '')}")
+        if not any(profile.get("status") == "Found" for profile in profiles):
+            lines.append("  No matching profiles found.")
+
+    collectors = data.get("results")
+    if isinstance(collectors, list):
+        lines.append("Collectors:")
+        for collector in collectors:
+            name = collector.get("collector", "Collector")
+            status = collector.get("status", "unknown")
+            reason = collector.get("reason") or collector.get("error")
+            lines.append(f"  [{status}] {name}" + (f" — {reason}" if reason else ""))
+            for finding in collector.get("results", [])[:10]:
+                if isinstance(finding, dict) and finding.get("url"):
+                    title = finding.get("title") or finding.get("provider") or finding.get("url")
+                    lines.append(f"    - {title}: {finding['url']}")
+
+    lookup = data.get("lookup")
+    if isinstance(lookup, dict):
+        lines.append(f"Hash lookup: {lookup.get('status', 'unknown')} ({lookup.get('source', 'no source')})")
+        if lookup.get("plaintext") is not None:
+            lines.append(f"Plaintext: {lookup['plaintext']}")
+            if not include_sensitive:
+                lines.append("  Use --show-plaintext to reveal it.")
+
+    artifacts = data.get("artifacts")
+    if isinstance(artifacts, list) and artifacts:
+        lines.append("Findings:")
+        for artifact in artifacts:
+            lines.append(f"  {artifact.get('type', 'finding')}: {artifact.get('value', '')}")
+
+    errors = data.get("errors")
+    if isinstance(errors, list) and errors:
+        lines.append("Notes:")
+        lines.extend(f"  - {error}" for error in errors)
+
+    return "\n".join(lines)
+
+
+def _run_with_progress(
+    target: str,
+    forced_type: str | None,
+    quiet: bool,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
+    from app.osint.engine import configure_timeout, investigate
+
+    if timeout_seconds is not None:
+        configure_timeout(timeout_seconds)
+
+    if quiet or not sys.stderr.isatty():
+        with redirect_stdout(sys.stderr):
+            return investigate(target, forced_type=forced_type)
+
+    stopped = threading.Event()
+
+    def report_elapsed() -> None:
+        started = time.monotonic()
+        while not stopped.wait(0.5):
+            elapsed = int(time.monotonic() - started)
+            print(f"\rInvestigating… {elapsed}s elapsed", end="", file=sys.stderr, flush=True)
+
+    progress = threading.Thread(target=report_elapsed, daemon=True)
+    progress.start()
+    try:
+        with redirect_stdout(sys.stderr):
+            return investigate(target, forced_type=forced_type)
+    finally:
+        stopped.set()
+        progress.join()
+        print("\rInvestigation finished.              ", file=sys.stderr, flush=True)
+
+
+def _has_partial_findings(value: Any) -> bool:
+    partial_statuses = {
+        "error", "failed", "partial", "source_unavailable", "rate_limited",
+        "timeout", "unavailable", "unknown", "unsupported", "placeholder",
+    }
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key.lower() == "status" and isinstance(item, str) and item.strip().lower().replace(" ", "_") in partial_statuses:
+                return True
+            if _has_partial_findings(item):
+                return True
+    elif isinstance(value, (list, tuple)):
+        return any(_has_partial_findings(item) for item in value)
+    return False
+
+
+def _exit_code(result: dict[str, Any]) -> int:
+    if not result.get("success"):
+        if result.get("error_type"):
+            return EXIT_ERROR
+        data = result.get("data") or {}
+        if not isinstance(data, dict):
+            data = {}
+        reason = str(data.get("error", result.get("reason", ""))).lower()
+        details = " ".join(str(item) for item in data.get("details", [])) if isinstance(data.get("details"), list) else str(data.get("details", ""))
+        validation_text = f"{reason} {details}".lower()
+        if (
+            "data" not in result
+            or data.get("valid") is False
+            or data.get("status") == "invalid"
+            or any(marker in validation_text for marker in ("invalid", "syntax", "must contain", "cannot be empty", "structural validation"))
+        ):
+            return EXIT_INVALID
+        return EXIT_ERROR
+    return EXIT_PARTIAL if _has_partial_findings(result.get("data", {})) else EXIT_OK
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        from app.config import load_user_config
+
+        load_user_config()
+        result = _run_with_progress(args.target, args.type, args.quiet, args.timeout)
+    except KeyboardInterrupt:
+        print("\nInvestigation interrupted.", file=sys.stderr)
+        return 130
+    except Exception as exc:
+        result = {"success": False, "target": args.target, "reason": f"Investigation failed: {exc}", "error_type": "runtime"}
+
+    code = _exit_code(result)
+    if args.format == "json":
+        rendered = json.dumps(_redact(result, args.show_plaintext), indent=2, ensure_ascii=False, default=str)
+    else:
+        rendered = _render_text(result, args.show_plaintext)
+
+    if args.output:
+        try:
+            destination = Path(args.output).expanduser()
+            destination.write_text(rendered + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"Could not write output file: {exc}", file=sys.stderr)
+            return EXIT_ERROR
+        print(f"Results written to {destination}", file=sys.stderr)
+    elif args.format == "json":
+        print(rendered)
+    else:
+        stream = sys.stdout
+        try:
+            print(rendered, file=stream)
+        except UnicodeEncodeError:
+            sys.stdout.buffer.write((rendered + "\n").encode("utf-8", errors="replace"))
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

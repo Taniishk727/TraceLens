@@ -37,7 +37,7 @@ def investigate(target):
         "success": True,
         "module": "IP Investigation",
         "target": str(address),
-        "status": "completed",
+        "status": "completed" if hostname else "partial",
         "summary": f"Classified IPv{address.version} address {address}; reverse DNS {'found ' + hostname if hostname else 'returned no hostname'}.",
         "artifacts": artifacts,
         "errors": errors,
