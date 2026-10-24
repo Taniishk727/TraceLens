@@ -1,45 +1,98 @@
 # TraceLens
 
-TraceLens is an OSINT investigation app with a Flask web interface. Its investigation engines are organized by target type so they can also be reused by another interface.
+TraceLens runs OSINT investigations through both a Linux command-line interface and a Flask web interface. Both interfaces call the same investigation dispatcher and target-specific engines.
 
-## Current capabilities
+## Install from GitHub on Linux
 
-- **Usernames:** Concurrent checks against registered public platform profile pages and APIs.
-- **Email addresses:** Syntax and provider metadata, DNS/domain checks, public account and identity signals, breach lookups, and reputation findings. Some providers require API keys or may be unavailable.
-- **Phone numbers:** Parsing and normalization, number classification, carrier metadata, public search, and risk/reputation signals.
-- **Hashes:** Format and algorithm identification plus public hash database lookups.
-- **Domains:** System DNS resolution to IPv4 and IPv6 addresses.
-- **IP addresses:** IPv4/IPv6 classification and reverse DNS lookup.
-
-Findings depend on the local resolver and external services. An unavailable source does not mean a target has no public information.
-
-## Current limitations
-
-- Investigations run synchronously in the web request.
-- Case storage, a persistent evidence store, interactive graph canvas, and report downloads are not implemented.
-- Browser-based username checks require Playwright and a compatible Chromium installation. Without them, those checks are reported as unavailable while other checks continue.
-- Breach-provider coverage depends on API configuration; set `HIBP_API_KEY` to use Have I Been Pwned.
-
-## Run the web app
+TraceLens supports Linux systems with Python 3.10 or newer. On Debian or Ubuntu, install Git, Python, and `pipx` first:
 
 ```sh
-python -m pip install -r requirements.txt
+sudo apt update
+sudo apt install -y git python3 python3-venv pipx
+pipx ensurepath
+```
+
+Open a new terminal after `pipx ensurepath` if the `pipx` command is not found. Install TraceLens directly from GitHub with [pipx](https://pipx.pypa.io/):
+
+```sh
+pipx install "git+https://github.com/Taniishk727/TraceLens.git"
+tracelens --help
+```
+
+Start the CLI with `tracelens`. To use the web interface, run `tracelens-web`; it is installed alongside the CLI. To download the source and install from a local checkout instead:
+
+```sh
+git clone https://github.com/Taniishk727/TraceLens.git
+cd TraceLens
+pipx install .
+```
+
+To update a GitHub installation later, run `pipx upgrade tracelens-osint`. For development, clone the repository, create a virtual environment, and run `python -m pip install -e ".[dev]"` from the repository directory.
+
+## CLI usage
+
+```sh
+tracelens investigate torvalds
+tracelens investigate user@example.com --format json
+tracelens investigate 203.0.113.10 --type ip --output result.json --format json
+tracelens investigate <hash> --type hash --show-plaintext
+tracelens investigate torvalds --timeout 5
+```
+
+Without `--type`, TraceLens attempts to identify the target type. Output is text by default; JSON is available for scripts. Hash lookup plaintext is redacted unless `--show-plaintext` is supplied. Exit codes are `0` for complete results, `1` for an investigation/configuration failure, `2` for invalid input or usage, `3` when results contain partial or unavailable sources, and `130` when interrupted.
+
+Username scans may take time. In an interactive terminal, progress is written to stderr so JSON on stdout remains usable in pipelines.
+`--timeout` overrides supported network collector timeouts in seconds; system DNS resolver calls may use their own timeout.
+
+## Web interface
+
+The Flask interface remains available from the same installation with `tracelens-web` (it binds to localhost by default). From a source checkout, you can also run:
+
+```sh
 python run.py
 ```
 
-The app listens on Flask's local development address. Do not expose the development server directly to an untrusted network.
+For browser-based username checks, install the optional browser dependency in a virtual environment and install Chromium:
 
-To enable browser-backed username checks, install Playwright separately and run `python -m playwright install chromium`.
+```sh
+python -m pip install -e ".[browser]"
+python -m playwright install chromium
+```
 
-## Layout
+Without Playwright and Chromium, browser-backed checks are reported unavailable; other checks continue. Do not expose Flask's development server directly to an untrusted network.
 
-- `app/routes.py` and `app/templates/`: Flask routes and pages.
-- `app/osint/engine.py`: Target detection and engine dispatch.
-- `app/osint/modules/`: Username, email, phone, and hash engines and collectors.
-- `app/osint/parsers/`: Domain, IP, and hash investigation entry points.
-- `app/osint/core/transport/`: Shared HTTP and optional browser transports.
-- `tests/`: Existing unit and route tests.
+## Configuration
 
-## Dependencies
+Environment variables take precedence over the user config file. TraceLens reads `HIBP_API_KEY` from the environment or from `config.json` at:
 
-The project currently uses Python, Flask, Requests, and `phonenumbers`. SQLAlchemy packages remain in `requirements.txt`, but the app does not currently persist investigations with a database.
+- Linux: `$XDG_CONFIG_HOME/tracelens/config.json`, or `~/.config/tracelens/config.json` if `XDG_CONFIG_HOME` is unset.
+- Windows: `%APPDATA%\tracelens\config.json`.
+
+Set `TRACELENS_CONFIG` to use a different config path. Example:
+
+```json
+{
+  "HIBP_API_KEY": "your-api-key"
+}
+```
+
+Keep the config file private because it may contain API credentials.
+
+## Current capabilities and limitations
+
+- **Usernames:** Concurrent public profile and API checks against the registered platform list. Browser-backed checks are optional.
+- **Email:** Provider/domain metadata, verification, account and identity signals, public search, reputation, avatars, PGP, Git profile, and breach lookups. Some providers need credentials or may be unavailable.
+- **Phone:** Parsing, number type, carrier metadata, public search, and risk/reputation signals.
+- **Hashes:** Format/algorithm identification and public hash lookups. Plaintext recovery is never guaranteed.
+- **Domains:** System DNS resolution to IPv4 and IPv6 addresses.
+- **IP addresses:** IPv4/IPv6 classification and reverse DNS lookup.
+
+Results depend on local DNS and external services. An unavailable source does not mean the target has no public information. Investigations currently run synchronously. Persistent cases, an interactive graph canvas, and report downloads are not implemented.
+
+## Project layout
+
+- `app/osint/`: Shared dispatcher, target engines, collectors, and transports.
+- `app/cli.py`: CLI interface (`tracelens`).
+- `app/routes.py`, `app/templates/`, `app/static/`: Flask web interface.
+- `run.py`: Web development-server entry point.
+- `tests/`: Existing tests.
