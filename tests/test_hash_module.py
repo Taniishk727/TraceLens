@@ -143,7 +143,25 @@ def test_detect_argon2_structured():
     assert res["valid"]
     assert res["status"] == "identified"
     assert res["confidence"] == "confirmed"
-    assert res["hash_type"] == "Argon2"
+    assert res["hash_type"] == "Argon2id"
+
+
+def test_detect_argon2_subtypes():
+    i_hash = "$argon2i$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$R29vZGJ5ZSBXb3JsZA"
+    res_i = investigate(i_hash)
+    assert res_i["valid"]
+    assert res_i["hash_type"] == "Argon2i"
+
+    d_hash = "$argon2d$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$R29vZGJ5ZSBXb3JsZA"
+    res_d = investigate(d_hash)
+    assert res_d["valid"]
+    assert res_d["hash_type"] == "Argon2d"
+
+
+def test_detect_malformed_structured_hash():
+    res_malformed_bcrypt = investigate("$2b$12$short")
+    assert res_malformed_bcrypt["status"] == "invalid"
+    assert "Malformed" in res_malformed_bcrypt["details"][0] or "invalid" in res_malformed_bcrypt["details"][0].lower()
 
 
 def test_detect_random_text():

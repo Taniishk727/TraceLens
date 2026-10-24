@@ -77,7 +77,7 @@ class HashEngine:
         # 4. Assemble Standardized Response Payload
         is_success = validation.valid
 
-        # Backward compatibility for Feature 1 keys
+        # Standard response payload
         identification_dict = {
             "status": detection.status.value,
             "confidence": detection.confidence.value,
@@ -86,8 +86,11 @@ class HashEngine:
             "length": detection.length,
             "encoding": detection.encoding,
             "details": detection.details,
+            "explanation": detection.explanation,
             "matches": [m.to_dict() for m in detection.matches],
         }
+
+        has_plaintext = lookup_dict.get("status") == LookupStatus.FOUND.value and lookup_dict.get("plaintext") is not None
 
         return {
             "success": is_success,
@@ -103,6 +106,7 @@ class HashEngine:
             "length": detection.length,
             "encoding": detection.encoding,
             "details": detection.details or (validation.details if not is_success else []),
+            "explanation": detection.explanation,
             "matches": [m.to_dict() for m in detection.matches],
             "identification": identification_dict,
             "lookup": lookup_dict,
@@ -116,7 +120,7 @@ class HashEngine:
                 "length": detection.length,
                 "encoding": detection.encoding,
                 "lookup_status": lookup_dict.get("status"),
-                "plaintext_recovered": bool(lookup_dict.get("plaintext")),
+                "plaintext_recovered": has_plaintext,
                 "lookup_source": lookup_dict.get("source"),
             },
             "metadata": {

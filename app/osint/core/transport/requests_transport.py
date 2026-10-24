@@ -5,12 +5,10 @@ Performs HTTP requests and returns a standardized response that
 matches the BrowserTransport interface.
 """
 
-import time
-import requests
-
-
 import os
 import time
+import threading
+
 import requests
 
 
@@ -28,8 +26,10 @@ class RequestsTransport:
         self.clear_cookies_per_request = clear_cookies_per_request
 
         self.session = requests.Session()
+        self._thread_local = threading.local()
+        self._thread_local.session = self.session
 
-        self.session.headers.update({
+        self._default_headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -52,11 +52,21 @@ class RequestsTransport:
             "Sec-Fetch-Mode": "navigate",
             "Sec-Fetch-Site": "none",
             "Sec-Fetch-User": "?1",
-        })
+        }
+        self.session.headers.update(self._default_headers)
+
+    def _get_session(self):
+        """Return a requests session owned by the calling thread."""
+        session = getattr(self._thread_local, "session", None)
+        if session is None:
+            session = requests.Session()
+            session.headers.update(self._default_headers)
+            self._thread_local.session = session
+        return session
 
     def clear_cookies(self):
         """Clears session cookies to prevent stale cookies across requests."""
-        self.session.cookies.clear()
+        self._get_session().cookies.clear()
 
     def fetch(self, url, allow_redirects=None, **kwargs):
         start = time.time()
@@ -65,19 +75,25 @@ class RequestsTransport:
         if allow_redirects is None:
             allow_redirects = self.allow_redirects
 
+        session = self._get_session()
+
         if self.clear_cookies_per_request:
             self.clear_cookies()
 
         if debug:
             print(f"\n[RequestsTransport DEBUG] Outgoing GET Request: {url}")
-            print(f"[RequestsTransport DEBUG] Headers: {dict(self.session.headers)}")
+            print(f"[RequestsTransport DEBUG] Headers: {dict(session.headers)}")
 
         try:
-            response = self.session.get(
+            request_options = dict(kwargs)
+            timeout = request_options.pop("timeout", self.timeout)
+            verify = request_options.pop("verify", self.verify_ssl)
+            response = session.get(
                 url,
-                timeout=self.timeout,
+                timeout=timeout,
                 allow_redirects=allow_redirects,
-                verify=self.verify_ssl,
+                verify=verify,
+                **request_options,
             )
 
             elapsed = round(time.time() - start, 2)
@@ -138,4 +154,4 @@ class RequestsTransport:
                 "elapsed": round(time.time() - start, 2),
                 "json": None,
                 "is_cloudflare_challenge": False,
-            }
+            }

@@ -37,7 +37,10 @@ import threading
 import time
 from concurrent.futures import Future
 
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:  # Browser-backed checks are optional for requests-only installs.
+    sync_playwright = None
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +130,8 @@ class BrowserTransport:
         context = None
 
         try:
+            if sync_playwright is None:
+                raise RuntimeError("Playwright is not installed; browser-backed checks are unavailable.")
             playwright = sync_playwright().start()
             browser = playwright.chromium.launch(headless=self.headless)
             context = self._create_fresh_context(browser)
@@ -567,6 +572,19 @@ class BrowserTransport:
             return {
                 "success": False,
                 "error": "BrowserTransport is stopped.",
+                "status": None,
+                "final_url": url,
+                "headers": {},
+                "html": "",
+                "length": 0,
+                "json": None,
+                "elapsed": 0.0,
+            }
+
+        if not any(worker.is_alive() for worker in self._workers):
+            return {
+                "success": False,
+                "error": "No browser workers are available. Install Playwright and its Chromium browser to enable browser-backed checks.",
                 "status": None,
                 "final_url": url,
                 "headers": {},

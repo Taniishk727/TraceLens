@@ -13,12 +13,20 @@ TraceLens | Invalid Target
     <div class="text-center mb-5">
 
         <h1 class="fw-bold text-danger">
+            {% if validation.data %}
+            Investigation Could Not Complete
+            {% else %}
             Target Validation Failed
+            {% endif %}
         </h1>
 
         <p class="text-secondary">
+            {% if validation.data %}
+            TraceLens accepted the target, but the investigation module reported a problem.
+            {% else %}
             TraceLens detected the intended target type,
             but the supplied input failed strict validation.
+            {% endif %}
         </p>
 
     </div>
@@ -38,7 +46,7 @@ TraceLens | Invalid Target
 
             <p>
 
-                <strong>Detected Target Type:</strong>
+                <strong>Target Type:</strong>
 
                 {{ validation.candidate|title }}
 

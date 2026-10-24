@@ -15,6 +15,8 @@ Responsibilities
 """
 # from transport.requests_transport import RequestsTransport
 # from transport.browser_transport import BrowserTransport
+import uuid
+
 from app.osint.modules.username.investigation import detect_target
 from app.osint.modules.username import username
 from app.osint.modules.email import engine as email
@@ -87,7 +89,12 @@ def run_module(target, target_type):
 
 def investigate(target, forced_type=None):
 
+    if not isinstance(target, str):
+        target = "" if target is None else str(target)
     target = target.strip()
+
+    if not target:
+        return {"success": False, "target": target, "reason": "Target cannot be empty.", "details": ["Enter a target to investigate."], "suggestions": []}
 
     # ------------------------------------------------------
     # Manual Override
@@ -95,11 +102,26 @@ def investigate(target, forced_type=None):
 
     if forced_type is not None:
 
+        forced_type = str(forced_type).strip().lower()
+        if forced_type not in MODULE_REGISTRY:
+            return {
+                "success": False,
+                "override": True,
+                "target": target,
+                "type": forced_type,
+                "reason": f"Unsupported investigation type: {forced_type}.",
+                "details": [f"Supported types: {', '.join(sorted(MODULE_REGISTRY))}."],
+                "suggestions": [],
+            }
+
         module_data = run_module(target, forced_type)
+        module_success = not isinstance(module_data, dict) or module_data.get("success", True) is not False
 
         return {
 
-            "success": True,
+            "success": module_success,
+
+            "investigation_id": uuid.uuid4().hex[:10].upper(),
 
             "override": True,
 
@@ -107,7 +129,7 @@ def investigate(target, forced_type=None):
 
             "type": forced_type,
 
-            "status": "Completed (Manual Override)",
+            "status": "Completed (Manual Override)" if module_success else "Investigation Failed",
 
             "data": module_data
 
@@ -148,10 +170,13 @@ def investigate(target, forced_type=None):
     target_type = detection["type"]
 
     module_data = run_module(target, target_type)
+    module_success = not isinstance(module_data, dict) or module_data.get("success", True) is not False
 
     return {
 
-        "success": True,
+        "success": module_success,
+
+        "investigation_id": uuid.uuid4().hex[:10].upper(),
 
         "override": False,
 
@@ -159,7 +184,7 @@ def investigate(target, forced_type=None):
 
         "type": target_type,
 
-        "status": "Completed",
+        "status": "Completed" if module_success else "Investigation Failed",
 
         "data": module_data
 

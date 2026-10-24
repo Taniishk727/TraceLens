@@ -50,8 +50,15 @@ def search():
     # Run investigation (synchronous — browser awaits while animation plays)
     result = investigate(target)
 
-    if result["success"]:
+    if result.get("success"):
         return render_template("results.html", result=result)
+
+    if "data" in result:
+        data = result.get("data") or {}
+        result.setdefault("candidate", result.get("type", "target"))
+        result["reason"] = data.get("error") or result.get("status", "Investigation failed.")
+        result["details"] = data.get("details") or data.get("errors") or []
+        result["suggestions"] = []
 
     return render_template("invalid_target.html", validation=result)
 
@@ -73,6 +80,11 @@ def override():
         )
 
     result = investigate(target, forced_type=forced_type)
+
+    if not result.get("success") and "data" not in result:
+        result.setdefault("candidate", forced_type.title())
+        result.setdefault("suggestions", [])
+        return render_template("invalid_target.html", validation=result)
 
     return render_template("results.html", result=result)
 
@@ -182,6 +194,7 @@ def api_hash_investigate():
         "encoding": result["encoding"],
         "hash_type": result["hash_type"],
         "details": result["details"],
+        "explanation": result.get("explanation"),
         "matches": result["matches"],
         "identification": result.get("identification", {}),
         "lookup": result.get("lookup", {}),

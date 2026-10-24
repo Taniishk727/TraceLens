@@ -59,16 +59,30 @@ class HashDetector:
 
         matching_defs = []
 
-        # 1. First check structured / prefix-based signature definitions
+        # 1. Check structured / prefix-based signature definitions
         if validation.is_structured:
             for algo in ALGORITHM_DEFINITIONS:
                 if algo["is_structured"] and algo["pattern"].match(target):
                     matching_defs.append(algo)
 
+            # If structured flag was set but no structured definition matched, the structured hash is malformed/invalid
+            if not matching_defs:
+                return HashDetectionResult(
+                    status=DetectionStatus.INVALID,
+                    confidence=DetectionConfidence.UNKNOWN,
+                    primary_type="Invalid",
+                    possible_types=[],
+                    length=target_len,
+                    encoding=validation.encoding,
+                    details=["Malformed structured hash format or invalid parameters."],
+                    matches=[],
+                    explanation="The input starts with a known structured hash prefix but does not satisfy strict structural component rules.",
+                )
+
         # 2. Check standard definitions (hex or base64 length matching)
         if not matching_defs:
             for algo in ALGORITHM_DEFINITIONS:
-                if algo["pattern"].match(target):
+                if not algo["is_structured"] and algo["pattern"].match(target):
                     matching_defs.append(algo)
 
         # 3. Process matches & determine confidence state
@@ -80,8 +94,9 @@ class HashDetector:
                 possible_types=[],
                 length=target_len,
                 encoding=validation.encoding,
-                details=[f"No matching algorithm registered for length {target_len}."],
+                details=[f"No matching algorithm registered for input of length {target_len}."],
                 matches=[],
+                explanation="The supplied value does not match any currently supported hash format or signature.",
             )
 
         # Create match objects
@@ -93,7 +108,7 @@ class HashDetector:
             confidence = (
                 DetectionConfidence.CONFIRMED
                 if algo["is_structured"]
-                else DetectionConfidence.LIKELY
+                else DetectionConfidence.CONFIRMED
             )
             match_obj = HashAlgorithmMatch(
                 name=algo["name"],
@@ -112,6 +127,7 @@ class HashDetector:
                 encoding=algo["encoding"],
                 details=[f"Algorithm uniquely identified as {algo['name']}."],
                 matches=matches,
+                explanation=f"The input format uniquely identifies the algorithm as {algo['name']}.",
             )
 
         # If multiple candidates share the exact representation (Ambiguous case)
@@ -128,6 +144,12 @@ class HashDetector:
                 )
             )
 
+        ambiguity_explanation = (
+            f"This is a {target_len}-character {validation.encoding.lower()} digest. "
+            f"Multiple supported algorithms use this exact representation, "
+            f"so the algorithm cannot be determined from the value alone."
+        )
+
         return HashDetectionResult(
             status=DetectionStatus.AMBIGUOUS,
             confidence=confidence,
@@ -139,4 +161,5 @@ class HashDetector:
                 f"Hash format is ambiguous. Matches {len(possible_names)} potential algorithms: {', '.join(possible_names)}."
             ],
             matches=matches,
+            explanation=ambiguity_explanation,
         )

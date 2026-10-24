@@ -188,7 +188,7 @@ class TestHashLookup(unittest.TestCase):
         self.assertEqual(data["lookup"]["status"], "found")
         self.assertEqual(data["lookup"]["plaintext"], "secret")
 
-    # 11. HTML Rendering for FOUND State
+    # 11. HTML Rendering for FOUND State (PLAINTEXT FIRST)
     @patch("app.osint.core.transport.requests_transport.RequestsTransport.fetch")
     def test_html_rendering_found_state(self, mock_fetch):
         mock_fetch.return_value = {
@@ -204,9 +204,15 @@ class TestHashLookup(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
 
-        self.assertIn("PLAINTEXT RECOVERY", html)
-        self.assertIn("MATCH FOUND", html)
+        self.assertIn("PLAINTEXT RECOVERED", html)
         self.assertIn("plaintext_password", html)
+
+        # Verify PLAINTEXT RECOVERED card appears BEFORE Hash Identification & Confidence card
+        plaintext_pos = html.find("PLAINTEXT RECOVERED")
+        ident_pos = html.find("Hash Identification & Confidence")
+        self.assertTrue(plaintext_pos != -1)
+        self.assertTrue(ident_pos != -1)
+        self.assertLess(plaintext_pos, ident_pos)
 
     # 12. HTML Rendering for NOT_FOUND State
     @patch("app.osint.core.transport.requests_transport.RequestsTransport.fetch")
@@ -225,8 +231,7 @@ class TestHashLookup(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
 
-        self.assertIn("PLAINTEXT RECOVERY", html)
-        self.assertIn("NO MATCH FOUND", html)
+        self.assertIn("PLAINTEXT NOT FOUND", html)
 
     # 13. HTML Rendering for SOURCE_UNAVAILABLE State
     @patch("app.osint.core.transport.requests_transport.RequestsTransport.fetch")
@@ -244,7 +249,6 @@ class TestHashLookup(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
 
-        self.assertIn("PLAINTEXT RECOVERY", html)
         self.assertIn("LOOKUP UNAVAILABLE", html)
 
 

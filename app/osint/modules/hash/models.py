@@ -84,6 +84,7 @@ class HashDetectionResult:
     encoding: str
     details: List[str] = field(default_factory=list)
     matches: List[HashAlgorithmMatch] = field(default_factory=list)
+    explanation: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -95,4 +96,5 @@ class HashDetectionResult:
             "encoding": self.encoding,
             "details": self.details,
             "matches": [m.to_dict() for m in self.matches],
+            "explanation": self.explanation,
         }

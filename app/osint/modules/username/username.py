@@ -197,12 +197,28 @@ def investigate(username: str) -> dict:
     # BrowserTransport.fetch() is thread-safe: any thread can call it;
     # it dispatches to an internal worker pool and blocks until complete.
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = [
-            executor.submit(run_detector, site, username, profiler)
+        future_to_site = {
+            executor.submit(run_detector, site, username, profiler): site
             for site in SITES
-        ]
-        for future in as_completed(futures):
-            profiles.append(future.result())
+        }
+        for future in as_completed(future_to_site):
+            site = future_to_site[future]
+            try:
+                profiles.append(future.result())
+            except Exception as exc:
+                # A broken detector or platform definition should not discard
+                # all findings from the other concurrent checks.
+                profiles.append({
+                    "site": site.get("name", "Unknown"),
+                    "category": site.get("category", "Unknown"),
+                    "url": site.get("url", "").format(username),
+                    "status": "Error",
+                    "status_code": None,
+                    "confidence": 0,
+                    "response_time": 0,
+                    "detector": site.get("detector"),
+                    "error": f"Detector failed: {exc}",
+                })
 
     # Collect browser pool statistics from the transport after all jobs finish
     profiler.record_browser_pool_stats(BROWSER_TRANSPORT.get_pool_stats())

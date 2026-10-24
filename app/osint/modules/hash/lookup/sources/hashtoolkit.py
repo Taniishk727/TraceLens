@@ -79,12 +79,26 @@ class HashToolkitSource(BaseLookupSource):
             )
 
         status_code = res.get("status")
+        html_content = res.get("html") or ""
+
         if status_code == 429:
             return LookupResult(
                 status=LookupStatus.RATE_LIMITED,
                 source=self.capability.name,
                 source_url=self.capability.documentation_url,
                 details=[f"Rate limit exceeded on {self.capability.name}."],
+                execution_time_ms=elapsed_ms,
+            )
+
+        if status_code in (403, 404, 401) or "Cloudflare" in html_content or "Attention Required!" in html_content:
+            return LookupResult(
+                status=LookupStatus.SOURCE_UNAVAILABLE,
+                source=self.capability.name,
+                source_url=self.capability.documentation_url,
+                details=[
+                    f"{self.capability.name} returned HTTP {status_code or 403} (Cloudflare anti-bot verification or endpoint change).",
+                    "Automated API lookup was unavailable or blocked by anti-bot protection."
+                ],
                 execution_time_ms=elapsed_ms,
             )
 

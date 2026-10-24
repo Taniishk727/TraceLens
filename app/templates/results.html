@@ -64,9 +64,9 @@ TraceLens | Investigation Results
                     </p>
 
                     <p>
-                        <strong>Investigation ID:</strong>
+                        <strong>Run ID:</strong>
 
-                        TL-0001
+                        {{ result.investigation_id }}
 
                     </p>
 
@@ -1838,6 +1838,7 @@ TraceLens | Investigation Results
     <!-- ========================================= -->
 
     {% set hdata = result.data %}
+    {% set lookup = hdata.lookup or {} %}
 
     <!-- Investigation Summary Banner -->
     <div class="card dashboard-card mb-4 border border-info border-opacity-50">
@@ -1863,20 +1864,153 @@ TraceLens | Investigation Results
         </div>
     </div>
 
-    <!-- Overview & Detection Cards -->
+    <!-- 1. PLAINTEXT RECOVERY CARD (Feature 2 - PLAINTEXT FIRST) -->
+    <div class="card dashboard-card mb-4 border {% if lookup.status == 'found' and lookup.plaintext is not none %}border-success{% elif lookup.status == 'not_found' %}border-secondary{% elif lookup.status == 'source_unavailable' %}border-warning{% else %}border-secondary{% endif %} border-opacity-50 shadow-lg">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h5 class="mb-0 text-info">
+                    <i class="bi bi-unlock-fill me-2 text-warning"></i>
+                    {% if lookup.status == 'found' and lookup.plaintext is not none %}
+                        PLAINTEXT RECOVERED
+                    {% elif lookup.status == 'not_found' %}
+                        PLAINTEXT NOT FOUND
+                    {% elif lookup.status == 'source_unavailable' %}
+                        LOOKUP UNAVAILABLE
+                    {% else %}
+                        PLAINTEXT RECOVERY
+                    {% endif %}
+                </h5>
+                {% if lookup.status == 'found' and lookup.plaintext is not none %}
+                    <span class="badge bg-success font-monospace px-3 py-2 fs-6">
+                        <i class="bi bi-check-circle-fill me-1"></i>PLAINTEXT RECOVERED
+                    </span>
+                {% elif lookup.status == 'not_found' %}
+                    <span class="badge bg-secondary font-monospace px-3 py-2 fs-6">
+                        <i class="bi bi-x-circle me-1"></i>PLAINTEXT NOT FOUND
+                    </span>
+                {% elif lookup.status == 'source_unavailable' %}
+                    <span class="badge bg-warning text-dark font-monospace px-3 py-2 fs-6">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>LOOKUP UNAVAILABLE
+                    </span>
+                {% elif lookup.status == 'rate_limited' %}
+                    <span class="badge bg-warning text-dark font-monospace px-3 py-2 fs-6">
+                        <i class="bi bi-speedometer2 me-1"></i>RATE LIMITED
+                    </span>
+                {% elif lookup.status == 'unsupported' %}
+                    <span class="badge bg-secondary font-monospace px-3 py-2 fs-6">
+                        <i class="bi bi-shield-slash me-1"></i>UNSUPPORTED ALGORITHM
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary font-monospace px-3 py-2 fs-6">
+                        <i class="bi bi-question-circle me-1"></i>UNCONFIRMED
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if lookup.status == 'found' and lookup.plaintext is not none %}
+                <!-- Found Plaintext Display -->
+                <div class="p-4 rounded bg-dark border border-success border-opacity-50 text-center mb-3 shadow">
+                    <span class="text-secondary small font-monospace d-block mb-2 text-uppercase">RECOVERED PLAINTEXT</span>
+                    <div class="fs-2 fw-bold font-monospace text-success text-break my-3 px-4 py-2 bg-black bg-opacity-75 rounded border border-success border-opacity-25 d-inline-block">
+                        {{ lookup.plaintext }}
+                    </div>
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-outline-success font-monospace px-4 py-2" data-copy-text="{{ lookup.plaintext }}" onclick="copyToClipboard(this.dataset.copyText, this)">
+                            <i class="bi bi-clipboard me-2"></i>Copy Plaintext
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row text-center g-3">
+                    <div class="col-md-6">
+                        <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
+                            <span class="text-secondary small d-block">Matched Algorithm</span>
+                            <span class="fw-bold font-monospace fs-6 text-info">{{ lookup.algorithm or hdata.hash_type or 'Unknown' }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
+                            <span class="text-secondary small d-block">Lookup Source</span>
+                            {% if lookup.source_url %}
+                                <a href="{{ lookup.source_url }}" target="_blank" rel="noopener noreferrer" class="fw-bold font-monospace fs-6 text-info text-decoration-underline">
+                                    {{ lookup.source }} <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                                </a>
+                            {% else %}
+                                <span class="fw-bold font-monospace fs-6 text-light">{{ lookup.source }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+            {% elif lookup.status == 'not_found' %}
+                <!-- Not Found Display -->
+                <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-search text-secondary fs-3 mt-1"></i>
+                        <div>
+                            <h6 class="fw-bold text-light mb-1">PLAINTEXT NOT FOUND</h6>
+                            <p class="text-secondary small mb-0">
+                                No matching plaintext was returned by the configured lookup source.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            {% elif lookup.status == 'source_unavailable' %}
+                <!-- Source Unavailable Display -->
+                <div class="p-3 rounded bg-dark border border-warning border-opacity-25">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-wifi-off text-warning fs-3 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <h6 class="fw-bold text-warning mb-1">LOOKUP UNAVAILABLE</h6>
+                            <p class="text-secondary small mb-2">
+                                The hash was identified, but the configured lookup source could not be queried.
+                            </p>
+                            {% if lookup.source_url %}
+                                <a href="{{ lookup.source_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-warning font-monospace">
+                                    <i class="bi bi-box-arrow-up-right me-1"></i>Open Source Manually
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+            {% elif lookup.status == 'unsupported' %}
+                <!-- Unsupported Format Display -->
+                <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-info-circle text-info fs-3 mt-1"></i>
+                        <div>
+                            <h6 class="fw-bold text-light mb-1">PLAINTEXT LOOKUP NON-APPLICABLE</h6>
+                            <p class="text-secondary small mb-0">
+                                Plaintext lookup databases do not support adaptive salted hash structures (such as bcrypt or Argon2).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            {% else %}
+                <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 text-secondary small">
+                    Lookup query complete.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2. Overview & Detection Cards -->
     <div class="row g-4 mb-4">
         <!-- Hash Input & Raw Display -->
         <div class="col-md-6">
             <div class="card dashboard-card h-100 border border-secondary border-opacity-25">
                 <div class="card-body">
                     <h5 class="text-info mb-3">
-                        <i class="bi bi-input-cursor-text me-2"></i>Hash Input
+                        <i class="bi bi-input-cursor-text me-2"></i>Hash Input & Properties
                     </h5>
 
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="text-secondary small">Original Input</label>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-monospace" style="font-size:0.75rem;" onclick="copyToClipboard('{{ hdata.input|escape }}', this)">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-monospace" style="font-size:0.75rem;" data-copy-text="{{ hdata.input }}" onclick="copyToClipboard(this.dataset.copyText, this)">
                                 <i class="bi bi-clipboard me-1"></i>Copy
                             </button>
                         </div>
@@ -1888,7 +2022,7 @@ TraceLens | Investigation Results
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="text-secondary small">Normalized Input</label>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-monospace" style="font-size:0.75rem;" onclick="copyToClipboard('{{ hdata.normalized|escape }}', this)">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 font-monospace" style="font-size:0.75rem;" data-copy-text="{{ hdata.normalized }}" onclick="copyToClipboard(this.dataset.copyText, this)">
                                 <i class="bi bi-clipboard me-1"></i>Copy
                             </button>
                         </div>
@@ -1920,7 +2054,7 @@ TraceLens | Investigation Results
             <div class="card dashboard-card h-100 border border-secondary border-opacity-25">
                 <div class="card-body">
                     <h5 class="text-info mb-3">
-                        <i class="bi bi-shield-check me-2"></i>Detection & Confidence
+                        <i class="bi bi-shield-check me-2"></i>Hash Identification & Confidence
                     </h5>
 
                     <!-- Status Display -->
@@ -1946,10 +2080,12 @@ TraceLens | Investigation Results
                             {% endif %}
                         </div>
                         <small class="text-muted d-block">
-                            {% if hdata.status == 'identified' %}
+                            {% if hdata.explanation %}
+                                {{ hdata.explanation }}
+                            {% elif hdata.status == 'identified' %}
                                 The hash format matches a supported algorithm.
                             {% elif hdata.status == 'ambiguous' %}
-                                Multiple algorithms match this hash format. Additional context is required to determine the exact algorithm.
+                                The supplied value matches multiple hash formats that share the same representation. The exact algorithm cannot be determined from the hash string alone.
                             {% elif hdata.status == 'invalid' %}
                                 The supplied input is not a valid hash format.
                             {% else %}
@@ -1982,11 +2118,11 @@ TraceLens | Investigation Results
                         </div>
                         <small class="text-muted d-block">
                             {% if hdata.confidence == 'confirmed' %}
-                                Unique modular crypt or signature format confirmed.
+                                Unique algorithm format or structured signature confirmed.
                             {% elif hdata.confidence == 'likely' %}
                                 Unambiguous algorithm format detected.
                             {% elif hdata.confidence == 'ambiguous' %}
-                                Multiple algorithms share this format.
+                                Multiple algorithms share this exact representation. Algorithm identity cannot be determined from string alone.
                             {% else %}
                                 Confidence state unconfirmed.
                             {% endif %}
@@ -2019,7 +2155,7 @@ TraceLens | Investigation Results
         </div>
     </div>
 
-    <!-- Detailed Matches Table -->
+    <!-- 3. Detailed Matches Table -->
     {% if hdata.matches %}
     <div class="card dashboard-card mb-4 border border-secondary border-opacity-25">
         <div class="card-body">
@@ -2060,127 +2196,31 @@ TraceLens | Investigation Results
     </div>
     {% endif %}
 
-    <!-- PLAINTEXT RECOVERY CARD (Feature 2) -->
-    {% set lookup = hdata.lookup or {} %}
-    <div class="card dashboard-card mb-4 border {% if lookup.status == 'found' %}border-success{% elif lookup.status == 'not_found' %}border-secondary{% elif lookup.status == 'source_unavailable' %}border-warning{% else %}border-secondary{% endif %} border-opacity-50">
+    {% elif result.type in ["domain", "ip"] %}
+
+    <div class="card dashboard-card mt-4 mb-4">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <h5 class="mb-0 text-info">
-                    <i class="bi bi-unlock-fill me-2 text-warning"></i>PLAINTEXT RECOVERY
-                </h5>
-                {% if lookup.status == 'found' %}
-                    <span class="badge bg-success font-monospace px-3 py-2 fs-6">
-                        <i class="bi bi-check-circle-fill me-1"></i>MATCH FOUND
-                    </span>
-                {% elif lookup.status == 'not_found' %}
-                    <span class="badge bg-secondary font-monospace px-3 py-2 fs-6">
-                        <i class="bi bi-x-circle me-1"></i>NO MATCH FOUND
-                    </span>
-                {% elif lookup.status == 'source_unavailable' %}
-                    <span class="badge bg-warning text-dark font-monospace px-3 py-2 fs-6">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>LOOKUP UNAVAILABLE
-                    </span>
-                {% elif lookup.status == 'rate_limited' %}
-                    <span class="badge bg-warning text-dark font-monospace px-3 py-2 fs-6">
-                        <i class="bi bi-speedometer2 me-1"></i>RATE LIMITED
-                    </span>
-                {% elif lookup.status == 'unsupported' %}
-                    <span class="badge bg-secondary font-monospace px-3 py-2 fs-6">
-                        <i class="bi bi-shield-slash me-1"></i>UNSUPPORTED ALGORITHM
-                    </span>
-                {% else %}
-                    <span class="badge bg-secondary font-monospace px-3 py-2 fs-6">
-                        <i class="bi bi-question-circle me-1"></i>UNCONFIRMED
-                    </span>
-                {% endif %}
-            </div>
-
-            {% if lookup.status == 'found' %}
-                <!-- Found Plaintext Display -->
-                <div class="p-3 rounded bg-dark border border-success border-opacity-50 mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="text-secondary small font-monospace">RECOVERED PLAINTEXT</label>
-                        <button type="button" class="btn btn-sm btn-outline-success font-monospace py-0 px-2" onclick="copyToClipboard('{{ lookup.plaintext|escape }}', this)">
-                            <i class="bi bi-clipboard me-1"></i>Copy Plaintext
-                        </button>
-                    </div>
-                    <div class="fs-4 fw-bold font-monospace text-success text-break p-2 bg-black bg-opacity-50 rounded border border-success border-opacity-25">
-                        {{ lookup.plaintext }}
-                    </div>
-                </div>
-
-                <div class="row text-center g-3">
-                    <div class="col-md-6">
-                        <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
-                            <span class="text-secondary small d-block">Matched Algorithm</span>
-                            <span class="fw-bold font-monospace fs-6 text-info">{{ lookup.algorithm or hdata.hash_type or 'MD5' }}</span>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="p-2 rounded bg-dark border border-secondary border-opacity-25">
-                            <span class="text-secondary small d-block">Lookup Source</span>
-                            {% if lookup.source_url %}
-                                <a href="{{ lookup.source_url }}" target="_blank" rel="noopener noreferrer" class="fw-bold font-monospace fs-6 text-info text-decoration-underline">
-                                    {{ lookup.source }} <i class="bi bi-box-arrow-up-right ms-1 small"></i>
-                                </a>
-                            {% else %}
-                                <span class="fw-bold font-monospace fs-6 text-light">{{ lookup.source }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-            {% elif lookup.status == 'not_found' %}
-                <!-- Not Found Display -->
-                <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
-                    <div class="d-flex align-items-start gap-3">
-                        <i class="bi bi-search text-secondary fs-3 mt-1"></i>
-                        <div>
-                            <h6 class="fw-bold text-light mb-1">No plaintext match found.</h6>
-                            <p class="text-secondary small mb-0">
-                                The hash was identified successfully, but no configured public lookup source returned a matching plaintext.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-            {% elif lookup.status == 'source_unavailable' %}
-                <!-- Source Unavailable Display -->
-                <div class="p-3 rounded bg-dark border border-warning border-opacity-25">
-                    <div class="d-flex align-items-start gap-3">
-                        <i class="bi bi-wifi-off text-warning fs-3 mt-1"></i>
-                        <div class="flex-grow-1">
-                            <h6 class="fw-bold text-warning mb-1">Lookup unavailable</h6>
-                            <p class="text-secondary small mb-2">
-                                The hash was identified, but the public lookup source could not be reached or requires interactive verification.
-                            </p>
-                            {% if lookup.source_url %}
-                                <a href="{{ lookup.source_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-warning font-monospace">
-                                    <i class="bi bi-box-arrow-up-right me-1"></i>Open Source Manually
-                                </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-            {% elif lookup.status == 'unsupported' %}
-                <!-- Unsupported Format Display -->
-                <div class="p-3 rounded bg-dark border border-secondary border-opacity-25">
-                    <div class="d-flex align-items-start gap-3">
-                        <i class="bi bi-info-circle text-info fs-3 mt-1"></i>
-                        <div>
-                            <h6 class="fw-bold text-light mb-1">Plaintext lookup non-applicable</h6>
-                            <p class="text-secondary small mb-0">
-                                Plaintext lookup databases do not support adaptive salted hash structures (such as bcrypt or Argon2).
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-            {% else %}
-                <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 text-secondary small">
-                    Lookup query complete.
-                </div>
+            <h4>{{ result.data.module }} Results</h4>
+            <p class="text-secondary">{{ result.data.summary }}</p>
+            {% if result.data.metadata %}
+            <dl class="row mb-0">
+                {% for key, value in result.data.metadata.items() %}
+                <dt class="col-sm-4 text-secondary">{{ key|replace('_', ' ')|title }}</dt>
+                <dd class="col-sm-8 text-light text-break">{{ value if value is not none else 'Unavailable' }}</dd>
+                {% endfor %}
+            </dl>
+            {% endif %}
+            {% if result.data.artifacts %}
+            <h5 class="mt-4">Findings</h5>
+            <ul class="mb-0">
+                {% for artifact in result.data.artifacts %}
+                <li><strong>{{ artifact.type|replace('_', ' ')|title }}:</strong> <span class="font-monospace">{{ artifact.value }}</span></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if result.data.errors %}
+            <h5 class="mt-4 text-warning">Lookup Notes</h5>
+            <ul class="mb-0">{% for error in result.data.errors %}<li>{{ error }}</li>{% endfor %}</ul>
             {% endif %}
         </div>
     </div>
@@ -2235,10 +2275,8 @@ TraceLens | Investigation Results
         </a>
         {% endif %}
 
-        <button class="btn btn-info">
-
-            Export Report
-
+        <button class="btn btn-outline-secondary" type="button" disabled title="Report export is not implemented yet">
+            Report export unavailable
         </button>
 
     </div>

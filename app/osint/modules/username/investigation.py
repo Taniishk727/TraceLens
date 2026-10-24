@@ -22,23 +22,8 @@ def is_valid_email(target):
 # ==========================================================
 
 def validate_ip(target):
-
-    parts = target.split(".")
-
-    if len(parts) != 4:
-        return {
-            "valid": False,
-            "candidate": "ip",
-            "reason": "IPv4 address must contain exactly 4 octets.",
-            "details": [
-                f"Found {len(parts)} octets."
-            ],
-            "suggestions": ["username", "domain"]
-        }
-
     try:
-
-        ipaddress.IPv4Address(target)
+        ipaddress.ip_address(target)
 
         return {
             "valid": True,
@@ -50,9 +35,9 @@ def validate_ip(target):
         return {
             "valid": False,
             "candidate": "ip",
-            "reason": "Invalid IPv4 address.",
+            "reason": "Invalid IP address.",
             "details": [
-                "Each octet must be between 0 and 255."
+                "Enter a valid IPv4 or IPv6 address."
             ],
             "suggestions": ["username", "domain"]
         }
@@ -92,35 +77,20 @@ def validate_domain(target):
 # ==========================================================
 
 def validate_phone(target):
+    from app.osint.modules.phone.validator import PhoneValidator, InvalidPhoneError
 
-    if len(target) != 10:
-
+    try:
+        PhoneValidator.validate(target)
+        return {"valid": True, "type": "phone"}
+    except InvalidPhoneError as exc:
+        digits = re.sub(r"\D", "", target)
         return {
             "valid": False,
             "candidate": "phone",
-            "reason": "Phone number must contain exactly 10 digits.",
-            "details": [
-                f"Found {len(target)} digits."
-            ],
-            "suggestions": ["username"]
+            "reason": str(exc),
+            "details": [f"Found {len(digits)} digits."],
+            "suggestions": ["username"],
         }
-
-    if not re.fullmatch(r'[6-9]\d{9}', target):
-
-        return {
-            "valid": False,
-            "candidate": "phone",
-            "reason": "Invalid Indian phone number.",
-            "details": [
-                "Phone number must begin with digits 6–9."
-            ],
-            "suggestions": ["username"]
-        }
-
-    return {
-        "valid": True,
-        "type": "phone"
-    }
 
 
 # ==========================================================
@@ -208,10 +178,16 @@ def identify_candidate(target):
     if "@" in target:
         return "email"
 
-    if target.count(".") >= 3:
+    try:
+        ipaddress.ip_address(target)
+        return "ip"
+    except ValueError:
+        pass
+
+    if target.count(".") == 3 and all(part.isdigit() for part in target.split(".")):
         return "ip"
 
-    if target.isdigit():
+    if re.fullmatch(r"\+?[\d\s().-]+", target) and 7 <= len(re.sub(r"\D", "", target)) <= 15:
         return "phone"
 
     if "." in target:
