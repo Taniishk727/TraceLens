@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tracelens-osint"
-version = "0.1.0"
+version = "0.1.1"
 description = "OSINT investigations with a shared Linux CLI and Flask web interface"
 readme = "README.md"
 requires-python = ">=3.10"
