@@ -45,6 +45,8 @@ tracelens investigate user@example.com --format json
 tracelens investigate 203.0.113.10 --type ip --output result.json --format json
 tracelens investigate HASH_VALUE --type hash --show-plaintext
 tracelens investigate torvalds --timeout 5
+tracelens -p +14155552671 --phone-intelligence
+tracelens -p +14155552671 --phone-intelligence --phone-last-verified-date 20261001
 ```
 
 `-H` shows the full help, including all investigation options and shortcuts. Use `--help` for standard help. Target shortcuts are `-u`/`--username`, `-e`/`--email`, `-d`/`--domain`, `-i`/`--ip`, `-p`/`--phone`, and `-h`/`-x`/`--hash`. Hash algorithm identification is automatic. The existing `tracelens investigate TARGET` command remains supported. Without a target shortcut or `--type`, TraceLens attempts to identify the target type. Output is text by default; JSON is available for scripts. Hash lookup plaintext is redacted unless `--show-plaintext` is supplied. Exit codes are `0` for complete results, `1` for an investigation/configuration failure, `2` for invalid input or usage, `3` when results contain partial or unavailable sources, and `130` when interrupted.
@@ -71,7 +73,7 @@ Without Playwright and Chromium, browser-backed checks are reported unavailable;
 
 ## Configuration
 
-Environment variables take precedence over the user config file. TraceLens reads `HIBP_API_KEY` and the optional `VIRUSTOTAL_API_KEY` from the environment or from `config.json` at:
+Environment variables take precedence over the user config file. TraceLens reads `HIBP_API_KEY`, `VIRUSTOTAL_API_KEY`, and optional `TWILIO_API_KEY` / `TWILIO_API_SECRET` from the environment or from `config.json` at:
 
 - Linux: `$XDG_CONFIG_HOME/tracelens/config.json`, or `~/.config/tracelens/config.json` if `XDG_CONFIG_HOME` is unset.
 - Windows: `%APPDATA%\tracelens\config.json`.
@@ -81,9 +83,13 @@ Set `TRACELENS_CONFIG` to use a different config path. Example:
 ```json
 {
   "HIBP_API_KEY": "your-api-key",
-  "VIRUSTOTAL_API_KEY": "your-api-key"
+  "VIRUSTOTAL_API_KEY": "your-api-key",
+  "TWILIO_API_KEY": "your-twilio-api-key-sid",
+  "TWILIO_API_SECRET": "your-twilio-api-key-secret"
 }
 ```
+
+Phone investigations query the free USACallerLookup public dataset for US numbers (carrier/assignment and FTC complaint summaries, when available). A complaint is an unverified report, not proof of wrongdoing. To explicitly request enhanced Twilio data, configure its API key and secret and add `--phone-intelligence`. This requests line type/carrier intelligence, line status, caller-name (CNAM), SIM-swap status, SMS-pumping risk, and phone-number quality score. Twilio's enhanced packages can incur per-request charges, and carrier/country coverage varies; the option is off unless requested. Caller-name is a CNAM listing, not proof that a person owns or controls the number. There is no reliable global free API for verified phone owners; free phone data services mainly provide number metadata or complaints. Twilio offers caller-name data for supported US numbers, billed per request even when no name is found. For the US reassigned-number check, pass `--phone-last-verified-date YYYYMMDD` using the date consent was obtained or the number was last verified; that package may also incur a charge and requires account access. In the web app, set `TRACELENS_PHONE_INTELLIGENCE=1` in the server environment to opt in to the Twilio lookups. Keep API credentials private.
 
 Hash lookups include the keyless CIRCL hashlookup catalog (MD5, SHA-1, SHA-256). A match gives known-file metadata, not plaintext and not a safety verdict. Add `VIRUSTOTAL_API_KEY` to enable VirusTotal file reports; its public API is limited to four requests per minute and intended for non-commercial or academic use. VirusTotal says queried indicators are added to its community dataset, so avoid querying sensitive or confidential indicators. Hash lookups send the queried hash to public services. Keep the config file private because it may contain API credentials.
 
@@ -91,7 +97,7 @@ Hash lookups include the keyless CIRCL hashlookup catalog (MD5, SHA-1, SHA-256).
 
 - **Usernames:** Concurrent public profile and API checks against the registered platform list. Browser-backed checks are optional.
 - **Email:** Provider/domain metadata, verification, account and identity signals, public search, reputation, avatars, PGP, Git profile, and breach lookups. Some providers need credentials or may be unavailable.
-- **Phone:** Parsing, number type, carrier metadata, public search, and risk/reputation signals.
+- **Phone:** Parsing, carrier/line type, public search, risk/reputation signals, free US public complaint data, and opt-in Twilio line status, caller-name, SIM-swap, reassignment, and SMS-pumping lookups.
 - **Hashes:** Format/algorithm identification, public plaintext lookup, known-file catalog lookup, and optional VirusTotal report lookup. Plaintext recovery is never guaranteed.
 - **Domains:** Validated IDNA domain input and bounded DNS lookups for A, AAAA, MX, NS, TXT, CAA, and SOA records, plus SPF and DMARC checks.
 - **IP addresses:** IPv4/IPv6 classification, reverse DNS, and optional keyless geolocation, network, and ASN enrichment for globally routable addresses.

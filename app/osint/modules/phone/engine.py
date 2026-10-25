@@ -13,6 +13,7 @@ Author:
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+import os
 import time
 from typing import Any
 
@@ -28,6 +29,8 @@ from app.osint.modules.phone.collectors import (
     PublicSearchCollector,
     ReputationCollector,
     ExportCollector,
+    PublicComplaintsCollector,
+    TwilioLookupCollector,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +51,8 @@ class PhoneEngine:
         self.register_collector(PublicSearchCollector())
         self.register_collector(ReputationCollector())
         self.register_collector(ExportCollector())
+        self.register_collector(PublicComplaintsCollector())
+        self.register_collector(TwilioLookupCollector())
 
     def register_collector(self, collector: BasePhoneCollector) -> None:
         """Registers a new collector instance into the engine pipeline."""
@@ -172,6 +177,10 @@ class PhoneEngine:
         stage1_collectors = [
             c for c in self._collectors
             if c.enabled and c.name not in ["Reputation Check Collector", "Risk Analysis Collector"]
+            and (
+                c.name != "Twilio Phone Intelligence"
+                or os.environ.get("TRACELENS_PHONE_INTELLIGENCE", "").strip().lower() in {"1", "true", "yes", "on"}
+            )
         ]
         reputation_collector = next((c for c in self._collectors if c.enabled and c.name == "Reputation Check Collector"), None)
         risk_collector = next((c for c in self._collectors if c.enabled and c.name == "Risk Analysis Collector"), None)

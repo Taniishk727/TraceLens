@@ -8,6 +8,8 @@ from app.osint.modules.phone.collectors.risk.collector import RiskCollector
 from app.osint.modules.phone.collectors.public_search.collector import PublicSearchCollector
 from app.osint.modules.phone.collectors.reputation.collector import ReputationCollector
 from app.osint.modules.phone.collectors.export_collector import ExportCollector
+from app.osint.modules.phone.collectors.public_complaints_collector import PublicComplaintsCollector
+from app.osint.modules.phone.collectors.twilio_lookup_collector import TwilioLookupCollector
 
 __all__ = [
     "ParsingCollector",
@@ -16,4 +18,6 @@ __all__ = [
     "PublicSearchCollector",
     "ReputationCollector",
     "ExportCollector",
+    "PublicComplaintsCollector",
+    "TwilioLookupCollector",
 ]

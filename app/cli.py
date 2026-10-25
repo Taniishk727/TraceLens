@@ -3,6 +3,7 @@
 import argparse
 from contextlib import redirect_stdout
 import json
+import os
 import sys
 import threading
 import time
@@ -69,6 +70,16 @@ def _parser() -> argparse.ArgumentParser:
         help="include plaintext recovered by hash lookups in output",
     )
     run.add_argument("--quiet", "-q", action="store_true", help="disable the elapsed-time indicator")
+    run.add_argument(
+        "--phone-intelligence",
+        action="store_true",
+        help="opt in to Twilio phone lookups (paid data packages may be billed)",
+    )
+    run.add_argument(
+        "--phone-last-verified-date",
+        metavar="YYYYMMDD",
+        help="consent/last-verified date for the optional US reassigned-number check",
+    )
     return parser
 
 
@@ -201,7 +212,28 @@ def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
 
     collectors = data.get("results")
     if isinstance(collectors, list):
-        _append_section(lines, "Collectors", {"items": collectors})
+        if data.get("module") == "Phone Investigation":
+            summaries = [
+                {key: collector.get(key) for key in ("collector", "status", "reason") if collector.get(key) is not None}
+                for collector in collectors
+                if isinstance(collector, dict)
+            ]
+            _append_section(lines, "Collectors", {"items": summaries})
+            phone_enrichment = {}
+            for collector in collectors:
+                if not isinstance(collector, dict) or collector.get("collector") not in {
+                    "US Public Number Reports",
+                    "Twilio Phone Intelligence",
+                }:
+                    continue
+                phone_enrichment[collector["collector"]] = {
+                    key: value
+                    for key, value in collector.items()
+                    if key not in {"collector", "category", "execution_time_ms"}
+                }
+            _append_section(lines, "Additional phone intelligence", phone_enrichment)
+        else:
+            _append_section(lines, "Collectors", {"items": collectors})
 
     lookup = data.get("lookup")
     if isinstance(lookup, dict):
@@ -256,6 +288,7 @@ def _has_partial_findings(value: Any) -> bool:
     partial_statuses = {
         "error", "failed", "partial", "source_unavailable", "rate_limited",
         "timeout", "unavailable", "unknown", "unsupported", "placeholder",
+        "not_configured", "invalid_configuration",
     }
     if isinstance(value, dict):
         for key, item in value.items():
@@ -303,7 +336,23 @@ def main(argv: list[str] | None = None) -> int:
         from app.config import load_user_config
 
         load_user_config()
-        result = _run_with_progress(args.target, args.type, args.quiet, args.timeout)
+        previous_phone_opt_in = os.environ.get("TRACELENS_PHONE_INTELLIGENCE")
+        previous_verified_date = os.environ.get("TRACELENS_PHONE_LAST_VERIFIED_DATE")
+        if args.phone_intelligence:
+            os.environ["TRACELENS_PHONE_INTELLIGENCE"] = "1"
+        if args.phone_last_verified_date:
+            os.environ["TRACELENS_PHONE_LAST_VERIFIED_DATE"] = args.phone_last_verified_date
+        try:
+            result = _run_with_progress(args.target, args.type, args.quiet, args.timeout)
+        finally:
+            if previous_phone_opt_in is None:
+                os.environ.pop("TRACELENS_PHONE_INTELLIGENCE", None)
+            else:
+                os.environ["TRACELENS_PHONE_INTELLIGENCE"] = previous_phone_opt_in
+            if previous_verified_date is None:
+                os.environ.pop("TRACELENS_PHONE_LAST_VERIFIED_DATE", None)
+            else:
+                os.environ["TRACELENS_PHONE_LAST_VERIFIED_DATE"] = previous_verified_date
     except KeyboardInterrupt:
         print("\nInvestigation interrupted.", file=sys.stderr)
         return 130
