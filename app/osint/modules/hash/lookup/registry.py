@@ -16,6 +16,8 @@ from app.osint.modules.hash.lookup.base import BaseLookupSource
 from app.osint.modules.hash.lookup.models import LookupResult, LookupStatus
 from app.osint.modules.hash.lookup.sources.hashtoolkit import HashToolkitSource
 from app.osint.modules.hash.lookup.sources.crackstation import CrackStationSource
+from app.osint.modules.hash.lookup.sources.circl_hashlookup import CIRCLHashlookupSource
+from app.osint.modules.hash.lookup.sources.virustotal import VirusTotalSource
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,8 @@ class LookupRegistry:
         # Register default lookup sources
         self.register_source(HashToolkitSource())
         self.register_source(CrackStationSource())
+        self.register_source(CIRCLHashlookupSource())
+        self.register_source(VirusTotalSource())
 
     def register_source(self, source: BaseLookupSource) -> None:
         """Registers a new lookup source into the engine pipeline."""
@@ -67,12 +71,21 @@ class LookupRegistry:
             )
 
         last_result: Optional[LookupResult] = None
+        database_matches: list[LookupResult] = []
 
         for source in active_sources:
             try:
                 res = source.lookup(hash_value, possible_algorithms=possible_algorithms)
                 if res.status == LookupStatus.FOUND:
-                    return res
+                    if res.plaintext is not None:
+                        if database_matches:
+                            res.metadata["database_matches"] = [
+                                {"source": item.source, "algorithm": item.algorithm, "metadata": item.metadata}
+                                for item in database_matches
+                            ]
+                        return res
+                    database_matches.append(res)
+                    continue
                 last_result = res
             except Exception as exc:
                 logger.error("[LookupRegistry] Source %s error: %s", source.capability.name, exc)
@@ -84,6 +97,19 @@ class LookupRegistry:
                 )
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        if database_matches:
+            return LookupResult(
+                status=LookupStatus.FOUND,
+                source=" / ".join(item.source for item in database_matches),
+                source_url=database_matches[0].source_url,
+                algorithm=database_matches[0].algorithm,
+                details=[detail for item in database_matches for detail in item.details],
+                execution_time_ms=elapsed_ms,
+                metadata={"database_matches": [
+                    {"source": item.source, "algorithm": item.algorithm, "metadata": item.metadata}
+                    for item in database_matches
+                ]},
+            )
         if last_result:
             last_result.execution_time_ms = elapsed_ms
             return last_result

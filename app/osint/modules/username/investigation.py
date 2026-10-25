@@ -48,29 +48,18 @@ def validate_ip(target):
 # ==========================================================
 
 def validate_domain(target):
-
-    pattern = (
-        r'^(?!-)(?:[A-Za-z0-9-]{1,63}\.)+'
-        r'[A-Za-z]{2,63}$'
-    )
-
-    if re.fullmatch(pattern, target):
-
+    from app.osint.parsers.domain import normalize_domain_name
+    try:
+        normalize_domain_name(target)
+        return {"valid": True, "type": "domain"}
+    except ValueError as exc:
         return {
-            "valid": True,
-            "type": "domain"
+            "valid": False,
+            "candidate": "domain",
+            "reason": "Invalid domain name.",
+            "details": [str(exc)],
+            "suggestions": ["username"]
         }
-
-    return {
-        "valid": False,
-        "candidate": "domain",
-        "reason": "Invalid domain name.",
-        "details": [
-            "Domain format is incorrect."
-        ],
-        "suggestions": ["username"]
-    }
-
 
 # ==========================================================
 # PHONE VALIDATION

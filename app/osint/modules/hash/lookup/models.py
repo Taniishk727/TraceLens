@@ -58,6 +58,7 @@ class LookupResult:
     algorithm: Optional[str] = None
     details: List[str] = field(default_factory=list)
     execution_time_ms: float = 0.0
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -68,4 +69,5 @@ class LookupResult:
             "algorithm": self.algorithm,
             "details": self.details,
             "execution_time_ms": self.execution_time_ms,
+            "metadata": self.metadata,
         }

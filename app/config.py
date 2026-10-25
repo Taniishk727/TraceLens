@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-SUPPORTED_SETTINGS = {"HIBP_API_KEY"}
+SUPPORTED_SETTINGS = {"HIBP_API_KEY", "VIRUSTOTAL_API_KEY"}
 
 
 def config_path() -> Path:

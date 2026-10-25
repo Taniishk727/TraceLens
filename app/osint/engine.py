@@ -100,6 +100,8 @@ def configure_timeout(timeout_seconds):
         email._ENGINE,
         phone_mod._ENGINE,
         _LOOKUP_REGISTRY,
+        domain,
+        ip,
     ]
     pending = list(roots)
     seen = set()

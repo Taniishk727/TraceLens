@@ -22,6 +22,15 @@ EXIT_ERROR = 1
 EXIT_INVALID = 2
 EXIT_PARTIAL = 3
 
+SHORTCUT_TYPES = {
+    "-u": "username", "--username": "username",
+    "-e": "email", "--email": "email",
+    "-d": "domain", "--domain": "domain",
+    "-i": "ip", "--ip": "ip",
+    "-p": "phone", "--phone": "phone",
+    "-x": "hash", "--hash": "hash",
+}
+
 
 def _positive_float(value: str) -> float:
     try:
@@ -39,7 +48,8 @@ def _parser() -> argparse.ArgumentParser:
         description="Investigate usernames, email addresses, phone numbers, domains, IPs, and hashes.",
     )
     parser.add_argument("--version", action="version", version=f"TraceLens {__version__}")
-    commands = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument("-H", "--full-help", action="store_true", help="show help for all commands and target shortcuts")
+    commands = parser.add_subparsers(dest="command", required=False)
     run = commands.add_parser("investigate", help="run an investigation")
     run.add_argument("target", help="target value to investigate")
     run.add_argument(
@@ -57,6 +67,32 @@ def _parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--quiet", "-q", action="store_true", help="disable the elapsed-time indicator")
     return parser
+
+
+def _investigation_help(parser: argparse.ArgumentParser) -> str:
+    action = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
+    run_parser = action.choices["investigate"]
+    shortcuts = (
+        "Target shortcuts (tracelens FLAG TARGET):\n"
+        "  -u, --username  Username investigation\n"
+        "  -e, --email     Email investigation\n"
+        "  -d, --domain    Domain investigation\n"
+        "  -i, --ip        IP address investigation\n"
+        "  -p, --phone     Phone investigation\n"
+        "  -x, --hash      Hash identification and lookup\n"
+    )
+    return parser.format_help() + "\n" + shortcuts + "\nInvestigate command options:\n" + run_parser.format_help()
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    if not argv:
+        return argv
+    target_type = SHORTCUT_TYPES.get(argv[0])
+    if target_type is None:
+        return argv
+    if len(argv) < 2:
+        return ["investigate", "--type", target_type]
+    return ["investigate", argv[1], "--type", target_type, *argv[2:]]
 
 
 def _redact(value: Any, include_sensitive: bool) -> Any:
@@ -161,6 +197,19 @@ def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
             lines.append(f"Plaintext: {lookup['plaintext']}")
             if not include_sensitive:
                 lines.append("  Use --show-plaintext to reveal it.")
+        for detail in lookup.get("details", []):
+            lines.append(f"  - {detail}")
+        lookup_metadata = lookup.get("metadata") or {}
+        for match in lookup_metadata.get("database_matches", []):
+            if not isinstance(match, dict):
+                continue
+            lines.append(f"  Database: {match.get('source', 'unknown')} ({match.get('algorithm') or 'algorithm ambiguous'})")
+            for key, value in match.get("metadata", {}).items():
+                if isinstance(value, dict):
+                    for nested_key, nested_value in value.items():
+                        lines.append(f"    {nested_key.replace('_', ' ').title()}: {nested_value}")
+                else:
+                    lines.append(f"    {key.replace('_', ' ').title()}: {value}")
 
     artifacts = data.get("artifacts")
     if isinstance(artifacts, list) and artifacts:
@@ -248,7 +297,15 @@ def _exit_code(result: dict[str, Any]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    parser = _parser()
+    if "-H" in raw_argv or "--full-help" in raw_argv:
+        print(_investigation_help(parser), end="")
+        return EXIT_OK
+    args = parser.parse_args(_normalize_argv(raw_argv))
+    if args.command is None:
+        parser.print_help()
+        return EXIT_INVALID
     try:
         from app.config import load_user_config
 
