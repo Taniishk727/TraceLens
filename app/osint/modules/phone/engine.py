@@ -23,7 +23,6 @@ from app.osint.modules.phone.validator import (
     InvalidPhoneError,
 )
 from app.osint.modules.phone.collectors import (
-    ParsingCollector,
     CarrierCollector,
     RiskCollector,
     PublicSearchCollector,
@@ -44,7 +43,6 @@ class PhoneEngine:
         self._collectors: list[BasePhoneCollector] = []
 
         # Register OSINT collectors
-        self.register_collector(ParsingCollector())
         self.register_collector(CarrierCollector())
         self.register_collector(RiskCollector())
         self.register_collector(PublicSearchCollector())
