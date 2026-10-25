@@ -6,7 +6,6 @@ import json
 import sys
 import threading
 import time
-import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -113,154 +112,108 @@ def _redact(value: Any, include_sensitive: bool) -> Any:
 
 
 def _display_scalar(value: Any) -> str:
-    if value is None:
-        return "—"
-    if isinstance(value, bool):
-        return "Yes" if value else "No"
-    return str(value)
+    return json.dumps(value, ensure_ascii=False, default=str)
 
 
 def _append_labeled_value(lines: list[str], label: str, value: Any, indent: int = 0) -> None:
-    """Append a value as readable, indented fields instead of Python repr output."""
+    """Append JSON-like fields with one property per line."""
     prefix = " " * indent
     if isinstance(value, dict):
-        lines.append(f"{prefix}{label}:")
-        if not value:
-            lines.append(f"{' ' * (indent + 2)}(none)")
-        for key, child in value.items():
-            _append_labeled_value(lines, str(key).replace("_", " ").title(), child, indent + 2)
+        lines.append(f'{prefix}{json.dumps(label) + ": " if label else ""}{{')
+        for index, (key, child) in enumerate(value.items()):
+            _append_labeled_value(lines, str(key), child, indent + 2)
+            if index < len(value) - 1:
+                lines[-1] += ","
+        lines.append(f"{prefix}}}")
         return
     if isinstance(value, (list, tuple)):
-        lines.append(f"{prefix}{label}:")
-        if not value:
-            lines.append(f"{' ' * (indent + 2)}(none)")
-        for item in value:
-            if isinstance(item, dict):
-                lines.append(f"{' ' * (indent + 2)}-")
-                for key, child in item.items():
-                    _append_labeled_value(lines, str(key).replace("_", " ").title(), child, indent + 4)
-            elif isinstance(item, (list, tuple)):
-                _append_labeled_value(lines, "-", item, indent + 2)
+        lines.append(f'{prefix}{json.dumps(label) + ": " if label else ""}[')
+        for index, item in enumerate(value):
+            if isinstance(item, (dict, list, tuple)):
+                _append_labeled_value(lines, "", item, indent + 2)
             else:
-                lines.append(f"{' ' * (indent + 2)}- {_display_scalar(item)}")
+                lines.append(f"{' ' * (indent + 2)}{_display_scalar(item)}")
+            if index < len(value) - 1:
+                lines[-1] += ","
+        lines.append(f"{prefix}]")
         return
+    lines.append(f'{prefix}{json.dumps(label) + ": " if label else ""}{_display_scalar(value)}')
 
-    value_text = _display_scalar(value)
-    label_text = f"{label}: "
-    initial_indent = f"{prefix}{label_text}"
-    subsequent_indent = f"{prefix}{' ' * len(label_text)}"
-    wrapped = textwrap.fill(value_text, width=100, initial_indent=initial_indent, subsequent_indent=subsequent_indent, break_long_words=False, break_on_hyphens=False)
-    lines.extend(wrapped.splitlines() or [initial_indent])
+
+def _append_section(lines: list[str], title: str, values: dict[str, Any]) -> None:
+    if not values:
+        return
+    if lines:
+        lines.append("=" * 72)
+    lines.append(title.upper())
+    lines.append("-" * 72)
+    _append_labeled_value(lines, title, values)
 
 
 def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
     output = _redact(result, include_sensitive)
-    lines = [
-        f"TraceLens — {str(output.get('type') or output.get('candidate') or 'Investigation').title()}",
-        f"Target: {output.get('target', '')}",
-        f"Status: {output.get('status') or ('completed' if output.get('success') else 'failed')}",
-    ]
+    title = f"TraceLens — {str(output.get('type') or output.get('candidate') or 'Investigation').title()}"
+    lines = [title]
+    overview = {
+        "target": output.get("target", ""),
+        "status": output.get("status") or ("completed" if output.get("success") else "failed"),
+    }
     if output.get("investigation_id"):
-        lines.append(f"Run ID: {output['investigation_id']}")
+        overview["run_id"] = output["investigation_id"]
+    if output.get("reason"):
+        overview["reason"] = output["reason"]
+    _append_section(lines, "Overview", overview)
 
     data = output.get("data")
     if not isinstance(data, dict):
-        if output.get("reason"):
-            lines.append(f"Reason: {output['reason']}")
-        for detail in output.get("details", []):
-            lines.append(f"  - {detail}")
+        if output.get("details"):
+            _append_section(lines, "Details", {"items": output["details"]})
         return "\n".join(lines)
 
-    lines.append(f"Module: {data.get('module', 'Unknown')}")
+    _append_section(lines, "Module", {"name": data.get("module", "Unknown")})
     summary = data.get("summary")
     if isinstance(summary, str):
-        _append_labeled_value(lines, "Summary", summary)
+        _append_section(lines, "Summary", {"text": summary})
     elif isinstance(summary, dict):
-        lines.append("Summary:")
-        for key, value in summary.items():
-            _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 2)
+        _append_section(lines, "Summary", summary)
 
     details = data.get("details")
     if isinstance(details, dict):
-        lines.append("Details:")
-        for key, value in details.items():
-            _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 2)
+        _append_section(lines, "Details", details)
     elif isinstance(details, list) and details:
-        lines.append("Details:")
-        _append_labeled_value(lines, "Items", details, 2)
+        _append_section(lines, "Details", {"items": details})
 
     identity = data.get("identity_summary")
     if isinstance(identity, dict):
-        lines.append("Identity assessment:")
-        for key, value in identity.items():
-            _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 2)
+        _append_section(lines, "Identity assessment", identity)
 
     evidence = data.get("evidence")
     if isinstance(evidence, list) and evidence:
-        lines.append("Evidence:")
-        for item in evidence:
-            if isinstance(item, dict):
-                lines.append("  -")
-                for key, value in item.items():
-                    _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 4)
+        _append_section(lines, "Evidence", {"items": evidence})
 
     usernames = data.get("discovered_usernames")
     if isinstance(usernames, list) and usernames:
-        lines.append("Discovered usernames:")
-        for item in usernames:
-            if isinstance(item, dict):
-                lines.append(f"  - {item.get('username', '')} ({item.get('provider', 'unknown')})")
+        _append_section(lines, "Discovered usernames", {"items": usernames})
 
     profiles = data.get("profiles")
     if isinstance(profiles, list):
-        lines.append("Platform checks:")
-        for profile in profiles:
-            if profile.get("status") == "Found":
-                lines.append(f"  [Found] {profile.get('site')}: {profile.get('url', '')}")
-        if not any(profile.get("status") == "Found" for profile in profiles):
-            lines.append("  No matching profiles found.")
+        _append_section(lines, "Platform checks", {"profiles": profiles})
 
     collectors = data.get("results")
     if isinstance(collectors, list):
-        lines.append("Collectors:")
-        for collector in collectors:
-            name = collector.get("collector", "Collector")
-            status = collector.get("status", "unknown")
-            reason = collector.get("reason") or collector.get("error")
-            lines.append(f"  [{status}] {name}" + (f" — {reason}" if reason else ""))
-            for finding in collector.get("results", [])[:10]:
-                if isinstance(finding, dict) and finding.get("url"):
-                    title = finding.get("title") or finding.get("provider") or finding.get("url")
-                    lines.append(f"    - {title}: {finding['url']}")
+        _append_section(lines, "Collectors", {"items": collectors})
 
     lookup = data.get("lookup")
     if isinstance(lookup, dict):
-        lines.append(f"Hash lookup: {lookup.get('status', 'unknown')} ({lookup.get('source', 'no source')})")
-        if lookup.get("plaintext") is not None:
-            lines.append(f"Plaintext: {lookup['plaintext']}")
-            if not include_sensitive:
-                lines.append("  Use --show-plaintext to reveal it.")
-        for detail in lookup.get("details", []):
-            lines.append(f"  - {detail}")
-        lookup_metadata = lookup.get("metadata") or {}
-        for match in lookup_metadata.get("database_matches", []):
-            if not isinstance(match, dict):
-                continue
-            lines.append(f"  Database: {match.get('source', 'unknown')} ({match.get('algorithm') or 'algorithm ambiguous'})")
-            _append_labeled_value(lines, "Metadata", match.get("metadata") or {}, 4)
+        _append_section(lines, "Hash lookup", lookup)
 
     artifacts = data.get("artifacts")
     if isinstance(artifacts, list) and artifacts:
-        lines.append("Findings:")
-        for artifact in artifacts:
-            if isinstance(artifact, dict):
-                label = str(artifact.get("type", "finding")).replace("_", " ").title()
-                _append_labeled_value(lines, label, artifact.get("value", ""), 2)
+        _append_section(lines, "Findings", {"items": artifacts})
 
     errors = data.get("errors")
     if isinstance(errors, list) and errors:
-        lines.append("Notes:")
-        _append_labeled_value(lines, "Items", errors, 2)
+        _append_section(lines, "Notes", {"items": errors})
 
     return "\n".join(lines)
 
