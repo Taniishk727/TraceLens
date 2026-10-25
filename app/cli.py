@@ -6,6 +6,7 @@ import json
 import sys
 import threading
 import time
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -111,6 +112,47 @@ def _redact(value: Any, include_sensitive: bool) -> Any:
     return value
 
 
+def _display_scalar(value: Any) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    return str(value)
+
+
+def _append_labeled_value(lines: list[str], label: str, value: Any, indent: int = 0) -> None:
+    """Append a value as readable, indented fields instead of Python repr output."""
+    prefix = " " * indent
+    if isinstance(value, dict):
+        lines.append(f"{prefix}{label}:")
+        if not value:
+            lines.append(f"{' ' * (indent + 2)}(none)")
+        for key, child in value.items():
+            _append_labeled_value(lines, str(key).replace("_", " ").title(), child, indent + 2)
+        return
+    if isinstance(value, (list, tuple)):
+        lines.append(f"{prefix}{label}:")
+        if not value:
+            lines.append(f"{' ' * (indent + 2)}(none)")
+        for item in value:
+            if isinstance(item, dict):
+                lines.append(f"{' ' * (indent + 2)}-")
+                for key, child in item.items():
+                    _append_labeled_value(lines, str(key).replace("_", " ").title(), child, indent + 4)
+            elif isinstance(item, (list, tuple)):
+                _append_labeled_value(lines, "-", item, indent + 2)
+            else:
+                lines.append(f"{' ' * (indent + 2)}- {_display_scalar(item)}")
+        return
+
+    value_text = _display_scalar(value)
+    label_text = f"{label}: "
+    initial_indent = f"{prefix}{label_text}"
+    subsequent_indent = f"{prefix}{' ' * len(label_text)}"
+    wrapped = textwrap.fill(value_text, width=100, initial_indent=initial_indent, subsequent_indent=subsequent_indent, break_long_words=False, break_on_hyphens=False)
+    lines.extend(wrapped.splitlines() or [initial_indent])
+
+
 def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
     output = _redact(result, include_sensitive)
     lines = [
@@ -132,37 +174,35 @@ def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
     lines.append(f"Module: {data.get('module', 'Unknown')}")
     summary = data.get("summary")
     if isinstance(summary, str):
-        lines.append(f"Summary: {summary}")
+        _append_labeled_value(lines, "Summary", summary)
     elif isinstance(summary, dict):
         lines.append("Summary:")
         for key, value in summary.items():
-            if isinstance(value, (str, int, float, bool)) or value is None:
-                lines.append(f"  {key.replace('_', ' ').title()}: {value}")
+            _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 2)
 
     details = data.get("details")
     if isinstance(details, dict):
         lines.append("Details:")
-        lines.extend(f"  {key.replace('_', ' ').title()}: {value}" for key, value in details.items())
+        for key, value in details.items():
+            _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 2)
     elif isinstance(details, list) and details:
         lines.append("Details:")
-        lines.extend(f"  - {item}" for item in details)
+        _append_labeled_value(lines, "Items", details, 2)
 
     identity = data.get("identity_summary")
     if isinstance(identity, dict):
         lines.append("Identity assessment:")
-        for key in ("confidence", "profiles_found", "evidence_count", "primary_identity"):
-            if identity.get(key) is not None:
-                lines.append(f"  {key.replace('_', ' ').title()}: {identity[key]}")
+        for key, value in identity.items():
+            _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 2)
 
     evidence = data.get("evidence")
     if isinstance(evidence, list) and evidence:
         lines.append("Evidence:")
         for item in evidence:
             if isinstance(item, dict):
-                label = item.get("type", "Finding")
-                value = item.get("value", "")
-                source = item.get("provider") or item.get("source")
-                lines.append(f"  - {label}: {value}" + (f" ({source})" if source else ""))
+                lines.append("  -")
+                for key, value in item.items():
+                    _append_labeled_value(lines, str(key).replace("_", " ").title(), value, 4)
 
     usernames = data.get("discovered_usernames")
     if isinstance(usernames, list) and usernames:
@@ -207,23 +247,20 @@ def _render_text(result: dict[str, Any], include_sensitive: bool) -> str:
             if not isinstance(match, dict):
                 continue
             lines.append(f"  Database: {match.get('source', 'unknown')} ({match.get('algorithm') or 'algorithm ambiguous'})")
-            for key, value in match.get("metadata", {}).items():
-                if isinstance(value, dict):
-                    for nested_key, nested_value in value.items():
-                        lines.append(f"    {nested_key.replace('_', ' ').title()}: {nested_value}")
-                else:
-                    lines.append(f"    {key.replace('_', ' ').title()}: {value}")
+            _append_labeled_value(lines, "Metadata", match.get("metadata") or {}, 4)
 
     artifacts = data.get("artifacts")
     if isinstance(artifacts, list) and artifacts:
         lines.append("Findings:")
         for artifact in artifacts:
-            lines.append(f"  {artifact.get('type', 'finding')}: {artifact.get('value', '')}")
+            if isinstance(artifact, dict):
+                label = str(artifact.get("type", "finding")).replace("_", " ").title()
+                _append_labeled_value(lines, label, artifact.get("value", ""), 2)
 
     errors = data.get("errors")
     if isinstance(errors, list) and errors:
         lines.append("Notes:")
-        lines.extend(f"  - {error}" for error in errors)
+        _append_labeled_value(lines, "Items", errors, 2)
 
     return "\n".join(lines)
 
