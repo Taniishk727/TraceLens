@@ -28,7 +28,7 @@ SHORTCUT_TYPES = {
     "-d": "domain", "--domain": "domain",
     "-i": "ip", "--ip": "ip",
     "-p": "phone", "--phone": "phone",
-    "-x": "hash", "--hash": "hash",
+    "-h": "hash", "-x": "hash", "--hash": "hash",
 }
 
 
@@ -46,11 +46,14 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tracelens",
         description="Investigate usernames, email addresses, phone numbers, domains, IPs, and hashes.",
+        add_help=False,
     )
+    parser.add_argument("--help", action="help", help="show this help message and exit")
     parser.add_argument("--version", action="version", version=f"TraceLens {__version__}")
     parser.add_argument("-H", "--full-help", action="store_true", help="show help for all commands and target shortcuts")
     commands = parser.add_subparsers(dest="command", required=False)
-    run = commands.add_parser("investigate", help="run an investigation")
+    run = commands.add_parser("investigate", help="run an investigation", add_help=False)
+    run.add_argument("--help", action="help", help="show this help message and exit")
     run.add_argument("target", help="target value to investigate")
     run.add_argument(
         "--type",
@@ -79,7 +82,7 @@ def _investigation_help(parser: argparse.ArgumentParser) -> str:
         "  -d, --domain    Domain investigation\n"
         "  -i, --ip        IP address investigation\n"
         "  -p, --phone     Phone investigation\n"
-        "  -x, --hash      Hash identification and lookup\n"
+        "  -h, -x, --hash  Hash identification and lookup (algorithm auto-detected)\n"
     )
     return parser.format_help() + "\n" + shortcuts + "\nInvestigate command options:\n" + run_parser.format_help()
 

@@ -5,7 +5,7 @@ called. Core investigations can therefore be imported by the CLI without
 initializing the web application.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 def create_app():

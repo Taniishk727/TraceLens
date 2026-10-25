@@ -38,8 +38,8 @@ tracelens -e user@example.com --format json
 tracelens -d example.com
 tracelens -i 203.0.113.10
 tracelens -p +14155552671
-tracelens -x HASH_VALUE
-tracelens --hash HASH_VALUE --show-plaintext
+tracelens -h HASH_VALUE
+tracelens -x HASH_VALUE --show-plaintext
 tracelens investigate torvalds
 tracelens investigate user@example.com --format json
 tracelens investigate 203.0.113.10 --type ip --output result.json --format json
@@ -47,7 +47,7 @@ tracelens investigate HASH_VALUE --type hash --show-plaintext
 tracelens investigate torvalds --timeout 5
 ```
 
-`-H` shows the full help, including all investigation options and shortcuts. Target shortcuts are `-u`/`--username`, `-e`/`--email`, `-d`/`--domain`, `-i`/`--ip`, `-p`/`--phone`, and `-x`/`--hash`. The existing `tracelens investigate TARGET` command remains supported. Without a target shortcut or `--type`, TraceLens attempts to identify the target type. Output is text by default; JSON is available for scripts. Hash lookup plaintext is redacted unless `--show-plaintext` is supplied. Exit codes are `0` for complete results, `1` for an investigation/configuration failure, `2` for invalid input or usage, `3` when results contain partial or unavailable sources, and `130` when interrupted.
+`-H` shows the full help, including all investigation options and shortcuts. Use `--help` for standard help. Target shortcuts are `-u`/`--username`, `-e`/`--email`, `-d`/`--domain`, `-i`/`--ip`, `-p`/`--phone`, and `-h`/`-x`/`--hash`. Hash algorithm identification is automatic. The existing `tracelens investigate TARGET` command remains supported. Without a target shortcut or `--type`, TraceLens attempts to identify the target type. Output is text by default; JSON is available for scripts. Hash lookup plaintext is redacted unless `--show-plaintext` is supplied. Exit codes are `0` for complete results, `1` for an investigation/configuration failure, `2` for invalid input or usage, `3` when results contain partial or unavailable sources, and `130` when interrupted.
 
 Username scans may take time. In an interactive terminal, progress is written to stderr so JSON on stdout remains usable in pipelines.
 `--timeout` overrides supported network collector timeouts in seconds; system DNS resolver calls may use their own timeout.
